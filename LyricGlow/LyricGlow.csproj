@@ -13,10 +13,12 @@
     <RootNamespace>LyricGlow</RootNamespace>
     <Product>Glowline</Product>
     <AssemblyTitle>Glowline</AssemblyTitle>
+    <Company>fSS</Company>
+    <Copyright>Copyright (c) 2026 fSS</Copyright>
     <Description>Synced music lyrics for everyone.</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>0.9.20</Version>
+    <Version>0.9.21</Version>
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
   </PropertyGroup>
 

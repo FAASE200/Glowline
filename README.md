@@ -60,7 +60,7 @@ dotnet publish LyricGlow/LyricGlow.csproj -c Release -r win-x64 `
 To build the Windows installer:
 
 ```powershell
-LyricGlow/tools/build-installers.ps1 -Version 0.9.20
+LyricGlow/tools/build-installers.ps1 -Version 0.9.21
 ```
 
 The Android project is included in the source tree, but its APK is not part of
@@ -78,7 +78,7 @@ update checks contact GitHub.
 
 Glowline is released under the [MIT License](LICENSE).
 
-The Glowline name and logo are brand assets of FaS Reprinted and are not
+The Glowline name and logo are brand assets of fSS and are not
 covered by the MIT License. See [NOTICE](NOTICE) for third-party notices and
 disclaimers.
 

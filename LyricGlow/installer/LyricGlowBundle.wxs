@@ -1,7 +1,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
   <Bundle Name="Glowline"
-          Manufacturer="FaS Reprinted"
+          Manufacturer="fSS"
           Version="$(var.Version)"
           UpgradeCode="C67B9EFA-A31E-40D9-B80E-AFA820A93819"
           IconSourceFile="$(var.ProjectDir)\app.ico">

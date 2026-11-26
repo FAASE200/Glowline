@@ -1518,7 +1518,7 @@ public partial class MainWindow : Window
 
         var loading = _loading;
         _loading = true;
-        VersionText.Text = "v" + UpdateService.CurrentVersionText;
+        VersionText.Text = "v" + UpdateService.CurrentVersionText + " · fSS";
         UpdateVersionText.Text = Loc.F("CurrentVersionFormat", UpdateService.CurrentVersionText);
         AutoUpdateCheck.IsChecked = _settings.Settings.AutoUpdateEnabled;
         _loading = loading;

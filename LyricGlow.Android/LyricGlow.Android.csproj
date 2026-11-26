@@ -28,14 +28,16 @@
 		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
 
 		<!-- Display name -->
-		<ApplicationTitle>LyricGlow</ApplicationTitle>
+		<ApplicationTitle>Glowline</ApplicationTitle>
+		<Company>fSS</Company>
+		<Copyright>Copyright (c) 2026 fSS</Copyright>
 
 		<!-- App Identifier -->
 		<ApplicationId>com.faase200.lyricglow</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>0.9.20</ApplicationDisplayVersion>
-		<ApplicationVersion>9020</ApplicationVersion>
+		<ApplicationDisplayVersion>0.9.21</ApplicationDisplayVersion>
+		<ApplicationVersion>9021</ApplicationVersion>
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>None</WindowsPackageType>

@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Company>fSS</Company>
+    <Copyright>Copyright (c) 2026 fSS</Copyright>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="LyricGlow" />

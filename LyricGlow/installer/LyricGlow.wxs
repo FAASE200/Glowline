@@ -1,6 +1,6 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="Glowline"
-           Manufacturer="FaS Reprinted"
+           Manufacturer="fSS"
            Version="$(var.Version)"
            UpgradeCode="5B8B9912-2B6E-4213-BC98-AE8340212364"
            Scope="$(var.Scope)"

@@ -123,7 +123,7 @@ public partial class MainPage : ContentPage
 
     void RefreshText()
     {
-        VersionText.Text = $"v{AppInfo.Current.Version} · Android {AppInfo.Current.BuildString}";
+        VersionText.Text = $"v{AppInfo.Current.Version} · Android {AppInfo.Current.BuildString} · fSS";
         SettingsButton.Text = "⚙";
         FullscreenButton.Text = MobileLoc.T("Android.Fullscreen");
         PermissionsTitle.Text = MobileLoc.T("Android.PermissionsTitle");
