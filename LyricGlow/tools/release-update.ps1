@@ -10,13 +10,40 @@ $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root 'LyricGlow.csproj'
 $publishToken = Join-Path $root '.secrets\publish.token'
 $updateToken = Join-Path $root '.secrets\update.token'
-$tokenFile = if (Test-Path $publishToken) { $publishToken } else { $updateToken }
 $exe = Join-Path $root 'publish\LyricGlow.exe'
 $publishDir = Join-Path $root 'publish'
 
-if (-not (Test-Path $tokenFile)) { throw "Falta $publishToken o $updateToken" }
-$token = (Get-Content $tokenFile -Raw).Trim()
-if ($token.Length -eq 0) { throw 'El token está vacío' }
+function Get-PublishToken {
+    if (Test-Path -LiteralPath $publishToken) {
+        $value = (Get-Content -LiteralPath $publishToken -Raw).Trim()
+        if ($value) { return @{ Token = $value; Source = '.secrets/publish.token' } }
+    }
+
+    $blob = Join-Path $env:USERPROFILE '.qoder\mcp\github-mcp\token.dat'
+    if (Test-Path -LiteralPath $blob) {
+        Add-Type -AssemblyName System.Security
+        try {
+            $enc = [IO.File]::ReadAllBytes($blob)
+            $dec = [Security.Cryptography.ProtectedData]::Unprotect(
+                $enc, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser)
+            $value = [Text.Encoding]::UTF8.GetString($dec).Trim()
+            if ($value) { return @{ Token = $value; Source = 'MCP GitHub (DPAPI)' } }
+        } catch {
+            throw 'No se pudo descifrar token.dat con este usuario de Windows.'
+        }
+    }
+
+    if (Test-Path -LiteralPath $updateToken) {
+        $value = (Get-Content -LiteralPath $updateToken -Raw).Trim()
+        if ($value) { return @{ Token = $value; Source = '.secrets/update.token' } }
+    }
+
+    throw 'No hay token. Crea .secrets/publish.token o configura el bridge de GitHub MCP.'
+}
+
+$credentials = Get-PublishToken
+$token = $credentials.Token
+Write-Host "Token: $($credentials.Source)"
 
 [xml]$xml = Get-Content $project
 $version = [string]@($xml.Project.PropertyGroup.Version)[0]
@@ -53,11 +80,22 @@ try {
         'header = "User-Agent: LyricGlow-Updater"'
     ) | Set-Content -Path $configFile -Encoding ASCII
 
+    $notes = @"
+Glowline $version Alpha
+
+Windows x64 portable build. This release starts the Glowline rebrand and moves updates to the public repository.
+
+- Renamed the visible app to Glowline.
+- Removed the Visualizer and the design editor.
+- Default interface palette is now black and white; album-art palette remains optional.
+- New public update feed with SHA-256 verification.
+- Android APK will be added in a later release.
+"@
     $body = @{
         tag_name = $tag
         target_commitish = 'main'
         name = $releaseName
-        body = "Glowline $version update."
+        body = $notes
         draft = $false
         prerelease = $false
     } | ConvertTo-Json -Compress

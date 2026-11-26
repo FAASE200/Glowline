@@ -16,7 +16,7 @@
     <Description>Synced music lyrics for everyone.</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>0.9.18</Version>
+    <Version>0.9.19</Version>
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
   </PropertyGroup>
 
