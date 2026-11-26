@@ -10,6 +10,7 @@ scratch/
 preview/
 animframe.png
 .qa/
+.selftest-data/
 
 # Secrets and signing material
 .secrets/

@@ -1,5 +1,0 @@
-2026-11-26 16:54:50.697 animated: fMP4 ajustado 10,00s, duración 5,67s
-2026-11-26 16:54:53.949 resolve[LRCLIB] 'ABBA — Dancing Queen' dur=231 -> 'Dancing Queen' / 'ABBA' (230s, word=True)
-2026-11-26 16:54:54.754 resolve[LRCLIB] 'Sabrina Carpenter — Espresso' dur=175 -> 'Espresso' / 'Sabrina Carpenter' (175s, word=True)
-2026-11-26 16:54:56.131 resolve[LyricsPlus] 'Sabrina Carpenter — Espresso' dur=175 -> 'Espresso' / 'Sabrina Carpenter' (175s, word=True, via=LyricsPlus · Apple)
-2026-11-26 16:54:57.726 resolve[Lrcmux] 'Sabrina Carpenter — Espresso' dur=175 -> 'Espresso' / 'Sabrina Carpenter' (175s, word=True, via=Lrcmux · Deezer)
