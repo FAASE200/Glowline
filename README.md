@@ -34,8 +34,8 @@ required.
 Windows may show a SmartScreen warning because the installer is not
 code-signed.
 
-The in-app updater downloads the new installer and opens it when you choose to
-install. The installer handles the file replacement for you.
+The in-app updater downloads the new installer. Per-user installations apply it
+on exit; per-machine installations open the installer for confirmation.
 
 ## Requirements
 

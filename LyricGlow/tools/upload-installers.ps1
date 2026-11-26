@@ -25,7 +25,7 @@ $tag = "v$Version"
 $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/FAASE200/Glowline/releases/tags/$tag" -Headers $headers
 Write-Host "Release $tag (id $($rel.id)); assets: $(($rel.assets | ForEach-Object name) -join ', ')"
 
-foreach ($name in @("LyricGlow-$Version.msi", "LyricGlowSetup-$Version.exe")) {
+foreach ($name in @("LyricGlowSetup-$Version.exe")) {
     if ($rel.assets.name -contains $name) {
         Write-Host "Ya existe: $name"
         continue
