@@ -1,0 +1,87 @@
+PASS parser count == 4 (got 4)
+PASS parser offset +250ms
+PASS parser multi-timestamp
+PASS parser strips word tags
+PASS parser word count == 2
+PASS parser word timing +250ms
+PASS lyricsfile parser
+PASS intro dots shown during 8.9s intro
+PASS intro dots hidden after first line
+PASS intro dots skipped under 7s
+PASS parenthetical text moved down
+PASS parenthetical-only line
+PASS parenthetical words split
+PASS LyricsPlus word conversion preserves missing spaces
+PASS LyricsPlus line conversion keeps line-only timing
+PASS LyricsPlus word conversion avoids inventing spaces for CJK
+PASS LyricsPlus word conversion falls back to line chunks
+PASS LyricsPlus conversion discards title and songwriter credit lines
+PASS default lyric source is Lrcmux
+PASS default interface theme is Dark
+PASS translucent interface is enabled by default
+PASS default language is Spanish
+PASS cover palette is enabled by default
+PASS settings live outside the app directory
+PASS settings round-trip preserves preferences
+PASS settings round-trip preserves active design
+PASS existing designs inherit the static cover size for animations
+PASS animated cover size stays independent from the static size
+PASS animated cover size clamps low
+PASS animated cover size clamps high
+PASS updater accepts a valid SHA-256 digest
+PASS updater rejects missing or short digests
+PASS glow package round-trip preserves design (got 'Test glow' Karaoke)
+PASS glow package round-trip preserves preview
+PASS glow package round-trip preserves boundary values
+PASS glow package rejects invalid archives
+PASS glow export rejects invalid design values
+PASS glow export rejects invalid preview images
+PASS glow export rejects oversized profile names
+PASS public update manifest parses version and tag
+PASS public update manifest builds download URL and digest
+PASS updater token is not embedded
+PASS 10 languages registered (got 10)
+PASS localization dictionaries complete (missing 0: )
+PASS Spanish dictionary is active (got 'Idioma', culture es-CL)
+PASS designer enum labels are localized
+PASS Japanese dictionary switches (got '言語', culture ja-JP)
+PASS formatted strings keep arguments (got '現在のバージョン: v9.9.9')
+PASS 600px player cover is high quality
+PASS under-600px player cover needs external art
+PASS cover accepts the same song with collab formatting (score 16,0)
+PASS cover rejects a similar title by another artist
+PASS cover rejects the same title from another album
+PASS cover rejects a similar but different title
+PASS cover reuses the same album artwork across editions
+PASS cover does not reuse artwork from another album
+PASS cover cache separates albums with the same artist+title
+PASS plain lyrics need LRCLIB fallback
+PASS synced lyrics are usable without fallback
+PASS animated searches by artist+album only (got 'artist=Linkin%20Park&album=Meteora')
+PASS animated picks AVC 960 (got 960)
+PASS animated resolves the fMP4 file
+PASS fMP4 timeline rebased (got 0,68)
+PASS fMP4 duration filled (got 136)
+PASS timeline starts at raw
+PASS timeline advances when raw is frozen
+PASS timeline keeps advancing
+PASS timeline follows a live raw update
+PASS timeline holds seek while raw is stale
+PASS timeline continues after seek
+PASS timeline pause uses raw
+PASS timeline resumes from raw
+PASS LRCLIB synced fetch + parse
+LRCLIB exact: Bohemian Rhapsody — Queen (synced=True, plain=True)
+parsed lines: 50; first: [0,05] Is this the real life? Is this just fantasy?
+search 'Bohemian Rhapsody Queen': 20 results
+resolve test: state=Synced, picked='Dancing Queen', lines=34, wordLines=34
+word-sync test: state=Synced, picked='Espresso', wordLines=56
+LyricsPlus get: Espresso — Sabrina Carpenter (source=LyricsPlus · Apple, synced=True, words=True)
+LyricsPlus parsed: 59 lines, 59 word lines; first=[8,89] Now he's thinkin' 'bout me every night, oh
+LyricsPlus service: state=Synced, source='LyricsPlus · Apple', lines=59, wordLines=59
+Lrcmux get: Espresso — Sabrina Carpenter (source=Lrcmux · Deezer, synced=True, words=True)
+Lrcmux parsed: 56 lines, 56 word lines; first=[8,96] Now he's thinkin' 'bout me every night, oh
+Lrcmux service: state=Synced, source='Lrcmux · Deezer', lines=56, wordLines=56
+SMTC sessions: 1
+  Brave pos=00:02:53.6347360 end=00:06:19.0588430 last=16:53:35
+RESULT: OK

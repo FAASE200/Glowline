@@ -160,7 +160,7 @@
   "UpdateChecking": "업데이트 확인 중…",
   "UpdateNoUpdatesPublished": "아직 게시된 업데이트가 없습니다",
   "UpdateUnrecognizedVersionFormat": "인식할 수 없는 버전: {0}",
-  "UpdateMissingAsset": "릴리스에 Glowline.exe가 없습니다",
+  "UpdateMissingAsset": "릴리스에 Windows 설치 프로그램이 포함되어 있지 않습니다",
   "UpdateUpToDateFormat": "최신 상태입니다(v{0})",
   "UpdateCancelled": "확인 취소됨",
   "UpdateCheckFailed": "업데이트를 확인할 수 없습니다",

@@ -160,7 +160,7 @@
   "UpdateChecking": "正在检查更新…",
   "UpdateNoUpdatesPublished": "尚未发布更新",
   "UpdateUnrecognizedVersionFormat": "无法识别的版本：{0}",
-  "UpdateMissingAsset": "该发布不包含 Glowline.exe",
+  "UpdateMissingAsset": "此版本不包含 Windows 安装程序",
   "UpdateUpToDateFormat": "已是最新版本（v{0}）",
   "UpdateCancelled": "检查已取消",
   "UpdateCheckFailed": "无法检查更新",

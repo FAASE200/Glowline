@@ -160,7 +160,7 @@
   "UpdateChecking": "Проверка обновлений…",
   "UpdateNoUpdatesPublished": "Опубликованных обновлений пока нет",
   "UpdateUnrecognizedVersionFormat": "Неизвестная версия: {0}",
-  "UpdateMissingAsset": "В релизе нет Glowline.exe",
+  "UpdateMissingAsset": "В релизе нет установщика Windows",
   "UpdateUpToDateFormat": "У вас последняя версия (v{0})",
   "UpdateCancelled": "Проверка отменена",
   "UpdateCheckFailed": "Не удалось проверить обновление",

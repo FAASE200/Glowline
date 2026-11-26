@@ -7,11 +7,11 @@ lyrics in a clean full-screen view. On Windows it uses the System Media
 Transport Controls (SMTC) to detect playback; word-by-word highlighting is used
 when the lyrics source provides it.
 
-The first public release will include only the Windows executable. Installers
-and the Android APK will be added later.
+Every public release includes only the Windows installer. The Android APK will
+be added in a later release.
 
-> The Windows executable keeps the internal name `LyricGlow.exe` for update
-> compatibility.
+> The installed Windows executable keeps the internal name `LyricGlow.exe` for
+> update compatibility.
 
 ## Features
 
@@ -26,12 +26,16 @@ and the Android APK will be added later.
 
 ## Download
 
-Download the latest `LyricGlow.exe` from
-[Releases](https://github.com/FAASE200/Glowline/releases). The release build is
-self-contained for Windows x64, so no .NET installation is required.
+Download the latest `LyricGlowSetup-<version>.exe` from
+[Releases](https://github.com/FAASE200/Glowline/releases). The installer
+includes the self-contained Windows x64 build, so no .NET installation is
+required.
 
-Windows may show a SmartScreen warning because the executable is not
+Windows may show a SmartScreen warning because the installer is not
 code-signed.
+
+The in-app updater downloads the new installer and opens it when you choose to
+install. The installer handles the file replacement for you.
 
 ## Requirements
 
@@ -44,13 +48,19 @@ code-signed.
 dotnet build LyricGlow/LyricGlow.csproj -c Release
 ```
 
-To produce the self-contained Windows executable used for releases:
+To produce the portable development build:
 
 ```powershell
 dotnet publish LyricGlow/LyricGlow.csproj -c Release -r win-x64 `
   --self-contained true -p:PublishSingleFile=true `
   -p:EnableCompressionInSingleFile=true `
-  -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+  -p:IncludeNativeLibrariesForSelfExtract=true -o LyricGlow/publish
+```
+
+To build the Windows installer:
+
+```powershell
+LyricGlow/tools/build-installers.ps1 -Version 0.9.20
 ```
 
 The Android project is included in the source tree, but its APK is not part of

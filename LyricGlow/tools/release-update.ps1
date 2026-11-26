@@ -8,10 +8,10 @@ if ($DryRun) { $SkipBuild = $true }
 
 $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root 'LyricGlow.csproj'
+$publishDir = Join-Path $root 'publish'
+$installerScript = Join-Path $PSScriptRoot 'build-installers.ps1'
 $publishToken = Join-Path $root '.secrets\publish.token'
 $updateToken = Join-Path $root '.secrets\update.token'
-$exe = Join-Path $root 'publish\LyricGlow.exe'
-$publishDir = Join-Path $root 'publish'
 
 function Get-PublishToken {
     if (Test-Path -LiteralPath $publishToken) {
@@ -52,17 +52,24 @@ $tag = "v$version"
 $releaseName = if (([version]$version).Major -lt 1) { "$tag Alpha" } else { "Glowline $tag" }
 
 if (-not $SkipBuild) {
-    Get-Process LyricGlow -ErrorAction SilentlyContinue | Stop-Process
     & dotnet publish $project -c Release -r win-x64 --self-contained true `
         -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true `
         -p:IncludeNativeLibrariesForSelfExtract=true -o $publishDir
-    if ($LASTEXITCODE -ne 0) { throw 'La publicación falló' }
+    if ($LASTEXITCODE -ne 0) { throw 'La publicación portable falló' }
+
+    & $installerScript -Version $version -PublishDir $publishDir
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudo construir el instalador' }
 }
 
-if (-not (Test-Path $exe)) { throw "No existe $exe" }
-$hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
-$size = (Get-Item $exe).Length
+$setup = Join-Path $publishDir "LyricGlowSetup-$version.exe"
+if (-not (Test-Path -LiteralPath $setup)) {
+    throw "Falta $setup; compila el instalador primero"
+}
+$assetName = Split-Path $setup -Leaf
+$hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+$size = (Get-Item $setup).Length
 Write-Host "Versión: $version ($tag)"
+Write-Host "Instalador: $assetName ($size bytes)"
 Write-Host "SHA-256: $hash"
 if ($DryRun) {
     Write-Host 'DryRun: no se creó ninguna release'
@@ -71,25 +78,24 @@ if ($DryRun) {
 
 $configFile = [IO.Path]::GetTempFileName()
 $bodyFile = [IO.Path]::GetTempFileName()
-$manifestFile = [IO.Path]::GetTempFileName()
 try {
     @(
         "header = `"Authorization: Bearer $token`"",
         'header = "Accept: application/vnd.github+json"',
         'header = "X-GitHub-Api-Version: 2022-11-28"',
-        'header = "User-Agent: LyricGlow-Updater"'
+        'header = "User-Agent: Glowline-Updater"'
     ) | Set-Content -Path $configFile -Encoding ASCII
 
     $notes = @"
 Glowline $version Alpha
 
-Windows x64 portable build. This release starts the Glowline rebrand and moves updates to the public repository.
+Windows x64 installer. This release starts the Glowline rebrand and moves updates to the public repository.
 
 - Renamed the visible app to Glowline.
 - Removed the Visualizer and the design editor.
 - Default interface palette is now black and white; album-art palette remains optional.
-- New public update feed with SHA-256 verification.
-- Android APK will be added in a later release.
+- Public auto-updates now download and open this installer.
+- No portable EXE or Android APK is attached.
 "@
     $body = @{
         tag_name = $tag
@@ -110,35 +116,14 @@ Windows x64 portable build. This release starts the Glowline rebrand and moves u
 
     $assetJson = & curl.exe -sS --config $configFile -X POST `
         -H 'Content-Type: application/octet-stream' `
-        --data-binary "@$exe" `
-        "https://uploads.github.com/repos/FAASE200/Glowline/releases/$($release.id)/assets?name=LyricGlow.exe"
+        --data-binary "@$setup" `
+        "https://uploads.github.com/repos/FAASE200/Glowline/releases/$($release.id)/assets?name=$([uri]::EscapeDataString($assetName))"
     $asset = $assetJson | ConvertFrom-Json
-    if (-not $asset.id) { throw "No se pudo subir el exe: $assetJson" }
-
-    $manifest = [ordered]@{
-        schemaVersion = 1
-        product = 'LyricGlow'
-        version = $version
-        tag = $tag
-        assets = @([pscustomobject]@{
-            Name = 'LyricGlow.exe'
-            Platform = 'windows-x64'
-            Size = $size
-            Sha256 = $hash
-        })
-    }
-    [IO.File]::WriteAllText($manifestFile, ($manifest | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
-    $manifestJson = & curl.exe -sS --config $configFile -X POST `
-        -H 'Content-Type: application/octet-stream' `
-        --data-binary "@$manifestFile" `
-        "https://uploads.github.com/repos/FAASE200/Glowline/releases/$($release.id)/assets?name=manifest.json"
-    $manifestAsset = $manifestJson | ConvertFrom-Json
-    if (-not $manifestAsset.id) { throw "No se pudo subir manifest.json: $manifestJson" }
+    if (-not $asset.id) { throw "No se pudo subir el instalador: $assetJson" }
 
     Write-Host "Release $tag publicada: $($release.html_url)"
     Write-Host "Asset: $($asset.name) · $($asset.size) bytes · $($asset.digest)"
-    Write-Host "Manifest: $($manifestAsset.name) · $($manifestAsset.size) bytes"
 }
 finally {
-    Remove-Item $configFile, $bodyFile, $manifestFile -ErrorAction SilentlyContinue
+    Remove-Item $configFile, $bodyFile -ErrorAction SilentlyContinue
 }

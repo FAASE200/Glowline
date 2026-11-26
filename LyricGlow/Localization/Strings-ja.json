@@ -160,7 +160,7 @@
   "UpdateChecking": "更新を確認中…",
   "UpdateNoUpdatesPublished": "公開された更新はまだありません",
   "UpdateUnrecognizedVersionFormat": "認識できないバージョン: {0}",
-  "UpdateMissingAsset": "リリースに Glowline.exe が含まれていません",
+  "UpdateMissingAsset": "リリースにWindowsインストーラーが含まれていません",
   "UpdateUpToDateFormat": "最新です（v{0}）",
   "UpdateCancelled": "確認をキャンセルしました",
   "UpdateCheckFailed": "更新を確認できませんでした",

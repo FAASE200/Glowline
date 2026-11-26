@@ -160,7 +160,7 @@
   "UpdateChecking": "Suche nach Updates…",
   "UpdateNoUpdatesPublished": "Noch keine Updates veröffentlicht",
   "UpdateUnrecognizedVersionFormat": "Unbekannte Version: {0}",
-  "UpdateMissingAsset": "Das Release enthält Glowline.exe nicht",
+  "UpdateMissingAsset": "Die Release enthält kein Windows-Installationsprogramm",
   "UpdateUpToDateFormat": "Du bist auf dem neuesten Stand (v{0})",
   "UpdateCancelled": "Prüfung abgebrochen",
   "UpdateCheckFailed": "Update-Prüfung fehlgeschlagen",

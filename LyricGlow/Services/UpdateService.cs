@@ -102,7 +102,9 @@ public sealed class UpdateService
                 return;
             }
 
-            var asset = _release.FindAsset(release, "LyricGlow.exe");
+            var asset = _release.FindAsset(release,
+                $"LyricGlowSetup-{Format(release.Version)}.exe",
+                "LyricGlow.exe");
             if (asset is null)
             {
                 SetState(UpdatePhase.Failed, "UpdateMissingAsset");
@@ -153,7 +155,10 @@ public sealed class UpdateService
     async Task DownloadAsync(UpdateInfo info, ReleaseAsset asset, CancellationToken ct)
     {
         Directory.CreateDirectory(_updatesDir);
-        var final = Path.Combine(_updatesDir, $"LyricGlow-{Format(info.Version)}.exe");
+        var fileName = Path.GetFileName(asset.Name);
+        if (string.IsNullOrWhiteSpace(fileName))
+            fileName = $"LyricGlow-{Format(info.Version)}.exe";
+        var final = Path.Combine(_updatesDir, fileName);
         if (File.Exists(final))
         {
             var existingHash = await HashFileAsync(final, ct);
@@ -200,6 +205,9 @@ public sealed class UpdateService
         var target = Environment.ProcessPath;
         if (string.IsNullOrEmpty(target)) return false;
 
+        if (Path.GetFileName(path).StartsWith("LyricGlowSetup-", StringComparison.OrdinalIgnoreCase))
+            return StartInstallerApply(path, target, restart);
+
         try
         {
             var psi = new ProcessStartInfo(path)
@@ -223,6 +231,73 @@ public sealed class UpdateService
             return false;
         }
     }
+
+    bool StartInstallerApply(string setup, string target, bool restart)
+    {
+        var localInstall = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Programs", "LyricGlow", "LyricGlow.exe");
+        var localInstallDir = Path.GetDirectoryName(localInstall) ?? "";
+        var targetDir = Path.GetDirectoryName(target) ?? "";
+        var perUserInstall = string.Equals(targetDir, localInstallDir, StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(target, localInstall, StringComparison.OrdinalIgnoreCase);
+        var perMachine = IsUnderProgramFiles(target);
+
+        if (perMachine && !restart)
+        {
+            Log.Write("update installer: per-machine install needs user confirmation");
+            return false;
+        }
+
+        var appToStart = perUserInstall ? target : localInstall;
+        var wait = $"Wait-Process -Id {Environment.ProcessId} -Timeout 30 -ErrorAction SilentlyContinue; ";
+        var start = restart
+            ? $"if (Test-Path -LiteralPath {PsQuote(appToStart)}) {{ Start-Process -FilePath {PsQuote(appToStart)} }}"
+            : "";
+        var script = perMachine
+            ? wait + $"Start-Process -FilePath {PsQuote(setup)}"
+            : wait +
+              $"Start-Process -FilePath {PsQuote(setup)} -ArgumentList '/quiet','/norestart' -Wait; " +
+              start;
+
+        try
+        {
+            var psi = new ProcessStartInfo("powershell.exe")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+            };
+            psi.ArgumentList.Add("-NoProfile");
+            psi.ArgumentList.Add("-ExecutionPolicy");
+            psi.ArgumentList.Add("Bypass");
+            psi.ArgumentList.Add("-WindowStyle");
+            psi.ArgumentList.Add("Hidden");
+            psi.ArgumentList.Add("-Command");
+            psi.ArgumentList.Add(script);
+            Process.Start(psi);
+            _applyStarted = true;
+            Log.Write($"update installer: setup={setup} app={appToStart} silent={!perMachine} restart={restart}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Write("update installer start: " + ex.Message);
+            return false;
+        }
+    }
+
+    static bool IsUnderProgramFiles(string path)
+    {
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+        return (!string.IsNullOrEmpty(programFiles) &&
+                path.StartsWith(programFiles + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) ||
+               (!string.IsNullOrEmpty(programFilesX86) &&
+                path.StartsWith(programFilesX86 + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
+    }
+
+    static string PsQuote(string value) => "'" + value.Replace("'", "''") + "'";
 
     public static void RunApplyUpdate(string target, string? waitPid, bool restart)
     {
