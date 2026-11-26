@@ -7,8 +7,8 @@ lyrics in a clean full-screen view. On Windows it uses the System Media
 Transport Controls (SMTC) to detect playback; word-by-word highlighting is used
 when the lyrics source provides it.
 
-The current public release includes only the Windows executable. Installers and
-the Android APK will be added later.
+The first public release will include only the Windows executable. Installers
+and the Android APK will be added later.
 
 > The Windows executable keeps the internal name `LyricGlow.exe` for update
 > compatibility.
