@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Theme xmlns="http://wixtoolset.org/schemas/v4/thmutil" ImageFile="cobalt-background.png">
+  <Font Id="0" Height="-12" Weight="500" Foreground="#0B1F4A" Background="window">Segoe UI</Font>
+  <Font Id="1" Height="-22" Weight="700" Foreground="#F5F5F7" Background="window">Segoe UI</Font>
+  <Font Id="2" Height="-12" Weight="500" Foreground="#BFDBFE" Background="window">Segoe UI</Font>
+  <Font Id="3" Height="-24" Weight="700" Foreground="#0B1F4A" Background="window">Segoe UI</Font>
+  <Font Id="4" Height="-11" Weight="600" Foreground="#526A8F" Background="window">Segoe UI</Font>
+
+  <!-- WiX rejects a window whose SourceX+Width equals the background width; keep cobalt-background.png at least 781x561. -->
+  <Window Width="780" Height="560" FontId="0" Caption="Glowline Setup"
+          SourceX="0" SourceY="0" HexStyle="100a0000">
+    <ImageControl X="28" Y="28" Width="64" Height="64" ImageFile="cobalt-logo.png" Visible="yes"/>
+    <Label X="104" Y="28" Width="150" Height="30" FontId="1" Visible="yes">Glowline</Label>
+    <Label X="104" Y="58" Width="150" Height="20" FontId="2" Visible="yes">Windows installer</Label>
+    <Label X="28" Y="160" Width="214" Height="96" FontId="1" Visible="yes">Synced music lyrics for everyone.</Label>
+    <Label X="28" Y="474" Width="214" Height="36" FontId="2" Visible="yes">Version 0.9.18 &#183; Windows x64</Label>
+
+    <Page Name="Loading">
+      <Label X="306" Y="48" Width="440" Height="40" FontId="3">Preparing Glowline</Label>
+      <Label X="306" Y="96" Width="440" Height="36" FontId="0">Checking your system and existing installation.</Label>
+    </Page>
+
+    <Page Name="Install">
+      <Label X="306" Y="36" Width="440" Height="40" FontId="3">Install Glowline</Label>
+      <Label X="306" Y="84" Width="440" Height="36" FontId="0">Choose the installation type and folder.</Label>
+
+      <Checkbox Name="InstallForAllUsers" X="306" Y="140" Width="440" Height="24" FontId="0" TabStop="yes">Install for all users (requires administrator)</Checkbox>
+
+      <Label X="306" Y="180" Width="440" Height="18" FontId="4" VisibleCondition="InstallForAllUsers = 0">Installation folder</Label>
+      <Editbox Name="InstallFolderUser" X="306" Y="202" Width="350" Height="24" FontId="0" TabStop="yes" FileSystemAutoComplete="yes" VisibleCondition="InstallForAllUsers = 0"/>
+      <Button Name="BrowseUserFolder" X="666" Y="201" Width="80" Height="26" FontId="0" TabStop="yes" VisibleCondition="InstallForAllUsers = 0">
+        <Text>Browse</Text>
+        <BrowseDirectoryAction VariableName="InstallFolderUser"/>
+      </Button>
+
+      <Label X="306" Y="180" Width="440" Height="18" FontId="4" VisibleCondition="InstallForAllUsers &gt; 0">Installation folder</Label>
+      <Editbox Name="InstallFolderMachine" X="306" Y="202" Width="350" Height="24" FontId="0" TabStop="yes" FileSystemAutoComplete="yes" VisibleCondition="InstallForAllUsers &gt; 0"/>
+      <Button Name="BrowseMachineFolder" X="666" Y="201" Width="80" Height="26" FontId="0" TabStop="yes" VisibleCondition="InstallForAllUsers &gt; 0">
+        <Text>Browse</Text>
+        <BrowseDirectoryAction VariableName="InstallFolderMachine"/>
+      </Button>
+
+      <Label X="306" Y="252" Width="440" Height="36" FontId="0">Includes Glowline, shortcuts and automatic updates.</Label>
+      <Label X="306" Y="294" Width="440" Height="36" FontId="0">Windows 10 or Windows 11, 64-bit. 82 MB required.</Label>
+
+      <Button Name="InstallCancelButton" X="306" Y="500" Width="100" Height="32" FontId="0" TabStop="yes">
+        <Text>Cancel</Text>
+        <CloseWindowAction/>
+      </Button>
+      <Button Name="InstallButton" X="646" Y="500" Width="100" Height="32" FontId="0" TabStop="yes">
+        <Text>Install</Text>
+      </Button>
+    </Page>
+
+    <Page Name="Modify">
+      <Label X="306" Y="48" Width="440" Height="40" FontId="3">Modify Glowline</Label>
+      <Label X="306" Y="96" Width="440" Height="36" FontId="0">Repair or remove the current installation.</Label>
+      <Button Name="RepairButton" X="306" Y="500" Width="100" Height="32" FontId="0" TabStop="yes">
+        <Text>Repair</Text>
+      </Button>
+      <Button Name="UninstallButton" X="416" Y="500" Width="100" Height="32" FontId="0" TabStop="yes">
+        <Text>Uninstall</Text>
+      </Button>
+      <Button Name="ModifyCancelButton" X="646" Y="500" Width="100" Height="32" FontId="0" TabStop="yes">
+        <Text>Close</Text>
+        <CloseWindowAction/>
+      </Button>
+    </Page>
+
+    <Page Name="Progress">
+      <Label X="306" Y="48" Width="440" Height="40" FontId="3">Installing Glowline</Label>
+      <Label X="306" Y="96" Width="330" Height="36" FontId="0">Copying files and creating shortcuts.</Label>
+      <Label Name="OverallProgressText" X="646" Y="96" Width="100" Height="40" FontId="3" Center="yes">0%</Label>
+      <Progressbar Name="OverallCalculatedProgressbar" X="306" Y="150" Width="440" Height="14" TabStop="no">
+        <ProgressbarImage ImageFile="cobalt-progress.png"/>
+      </Progressbar>
+      <Label X="306" Y="182" Width="440" Height="24" FontId="4">Installing files and creating shortcuts.</Label>
+      <Label Name="OverallProgressPackageText" X="306" Y="238" Width="440" Height="24" FontId="0">Glowline</Label>
+      <Label Name="ExecuteProgressText" X="306" Y="270" Width="440" Height="24" FontId="0">Installing files</Label>
+      <Label Name="ExecuteProgressActionDataText" X="306" Y="302" Width="440" Height="24" FontId="4">Creating shortcuts</Label>
+      <Button Name="ProgressCancelButton" X="306" Y="500" Width="100" Height="32" FontId="0" TabStop="yes">
+        <Text>Cancel</Text>
+        <CloseWindowAction/>
+      </Button>
+    </Page>
+
+    <Page Name="Success">
+      <Label X="306" Y="80" Width="440" Height="40" FontId="3">Glowline is ready</Label>
+      <Label X="306" Y="132" Width="440" Height="48" FontId="0">You can now play your music with synced lyrics.</Label>
+      <Button Name="LaunchButton" X="306" Y="500" Width="240" Height="32" FontId="0" TabStop="yes">
+        <Text>Finish and launch Glowline</Text>
+      </Button>
+    </Page>
+
+    <Page Name="Failure">
+      <Label X="306" Y="48" Width="440" Height="40" FontId="3">Glowline could not be installed</Label>
+      <Label X="306" Y="96" Width="440" Height="36" FontId="0">Something went wrong. You can close this window and try again.</Label>
+      <Hypertext Name="FailureMessageText" X="306" Y="144" Width="440" Height="120" FontId="0" TabStop="yes"/>
+      <Hypertext Name="FailureLogFileLink" X="306" Y="270" Width="440" Height="24" FontId="0" TabStop="yes" HideWhenDisabled="yes">Open the installation log</Hypertext>
+      <Button Name="FailureCloseButton" X="646" Y="500" Width="100" Height="32" FontId="0" TabStop="yes">
+        <Text>Close</Text>
+        <CloseWindowAction/>
+      </Button>
+    </Page>
+
+    <Page Name="Help">
+      <Label X="306" Y="48" Width="440" Height="40" FontId="3">Glowline Setup Help</Label>
+      <Label X="306" Y="96" Width="440" Height="120" FontId="0">Choose whether to install for all users, then select Install. The default folder can be changed before continuing.</Label>
+      <Button Name="HelpCloseButton" X="646" Y="500" Width="100" Height="32" FontId="0" TabStop="yes">
+        <Text>Close</Text>
+        <CloseWindowAction/>
+      </Button>
+    </Page>
+  </Window>
+</Theme>

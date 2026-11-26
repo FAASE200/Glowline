@@ -1,0 +1,22 @@
+Glowline
+Copyright (c) 2026 fSS
+
+Glowline is not affiliated with, endorsed by, or sponsored by Apple Inc. or
+any other music service. All product names, logos, and brands are the property
+of their respective owners.
+
+Glowline does not host or distribute lyrics or album artwork. Lyrics and
+artwork are retrieved at runtime from third-party services and remain the
+property of their respective owners. Users are responsible for complying with
+the terms of the services they use.
+
+The Glowline name and logo are brand assets of FaS Reprinted and are not
+covered by the MIT License that applies to the source code.
+
+Third-party software used by this project includes:
+
+- .NET, Windows Presentation Foundation, .NET MAUI and
+  Microsoft.Extensions.Logging.Debug, licensed under the MIT License.
+- NAudio, licensed under the MIT License.
+
+Refer to the respective packages for their full license texts.

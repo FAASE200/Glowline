@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="LyricGlow.Android.FullscreenPage"
+             BackgroundColor="#08080A">
+
+    <Grid x:Name="RootGrid">
+        <Grid x:Name="DarkLayout">
+            <Image x:Name="DarkBackdropA" Aspect="AspectFill" Opacity="0.55" />
+            <Image x:Name="DarkBackdropB" Aspect="AspectFill" Opacity="0" />
+            <Border x:Name="DarkTint" StrokeThickness="0">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0.6,1">
+                        <GradientStop Color="#B3000000" Offset="0" />
+                        <GradientStop Color="#66000000" Offset="0.45" />
+                        <GradientStop Color="#E6000000" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
+
+            <Grid x:Name="DarkContent" Padding="18,54,18,10" RowDefinitions="Auto,*,Auto" RowSpacing="10">
+                <Grid x:Name="DarkHeader" ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                    <Border x:Name="DarkCoverBorder" WidthRequest="128" HeightRequest="128" StrokeThickness="0"
+                            BackgroundColor="#17171B" Padding="0" StrokeShape="RoundRectangle 18">
+                        <Border.Shadow>
+                            <Shadow Brush="Black" Opacity="0.55" Radius="28" Offset="0,10" />
+                        </Border.Shadow>
+                        <Grid>
+                            <Label x:Name="DarkCoverPlaceholder" Text="♪" FontSize="40" TextColor="#22FFFFFF"
+                                   HorizontalOptions="Center" VerticalOptions="Center" />
+                            <Image x:Name="DarkCoverA" Aspect="AspectFill" />
+                            <Image x:Name="DarkCoverB" Aspect="AspectFill" Opacity="0" />
+                            <Border x:Name="DarkCoverMask" StrokeThickness="0" BackgroundColor="Transparent" />
+                        </Grid>
+                    </Border>
+
+                    <VerticalStackLayout x:Name="DarkMeta" Grid.Column="1" VerticalOptions="Center" Spacing="3">
+                        <Label x:Name="DarkTitleLabel" FontSize="23" FontFamily="InterSemiBold" TextColor="White"
+                               MaxLines="2" LineBreakMode="TailTruncation" />
+                        <Label x:Name="DarkArtistLabel" FontSize="14" FontFamily="Inter" TextColor="#B8FFFFFF"
+                               MaxLines="1" LineBreakMode="TailTruncation" />
+                        <Label x:Name="DarkAlbumLabel" FontSize="11" FontFamily="Inter" TextColor="#66FFFFFF"
+                               MaxLines="1" LineBreakMode="TailTruncation" />
+                    </VerticalStackLayout>
+                </Grid>
+
+                <Grid x:Name="DarkLyricsHost" Grid.Row="1" IsClippedToBounds="True">
+                    <Grid x:Name="DarkVerseLayer">
+                        <Grid x:Name="DarkScrollLayer" VerticalOptions="Start">
+                            <VerticalStackLayout x:Name="DarkLyricsStack" Spacing="24" />
+                        </Grid>
+                    </Grid>
+                    <ScrollView x:Name="DarkPlainScroll" IsVisible="False">
+                        <Label x:Name="DarkPlainLabel" FontSize="20" LineHeight="1.5" TextColor="#DCFFFFFF"
+                               LineBreakMode="WordWrap" />
+                    </ScrollView>
+                    <Label x:Name="DarkStatusLabel" IsVisible="False" FontSize="20" TextColor="#99FFFFFF"
+                           HorizontalTextAlignment="Center" VerticalOptions="Center" LineBreakMode="WordWrap"
+                           HorizontalOptions="Center" MaximumWidthRequest="520" />
+                    <HorizontalStackLayout x:Name="DarkDotsRow" IsVisible="False" Spacing="10"
+                                           HorizontalOptions="Center" VerticalOptions="Center" />
+                </Grid>
+
+                <VerticalStackLayout x:Name="DarkBottom" Grid.Row="2" Spacing="6">
+                    <Grid x:Name="DarkProgressRow" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <Label x:Name="DarkPositionLabel" FontSize="11" TextColor="#80FFFFFF" VerticalOptions="Center" />
+                        <Slider x:Name="DarkPositionSlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0"
+                                MinimumTrackColor="#FF375F" MaximumTrackColor="#26FFFFFF" ThumbColor="White"
+                                DragStarted="OnSeekStart" DragCompleted="OnSeekEnd" />
+                        <Label x:Name="DarkDurationLabel" Grid.Column="2" FontSize="11" TextColor="#80FFFFFF"
+                               VerticalOptions="Center" />
+                    </Grid>
+                    <HorizontalStackLayout x:Name="DarkTransportButtons" HorizontalOptions="Center" Spacing="18">
+                        <Button x:Name="DarkPreviousButton" Text="⏮" FontSize="17" WidthRequest="46" HeightRequest="46"
+                                Padding="0" CornerRadius="23" BackgroundColor="#1AFFFFFF" TextColor="White" Clicked="OnPrevious" />
+                        <Button x:Name="DarkPlayButton" Text="▶" FontSize="18" WidthRequest="46" HeightRequest="46"
+                                Padding="0" CornerRadius="23" BackgroundColor="#1AFFFFFF" TextColor="White" Clicked="OnPlayPause" />
+                        <Button x:Name="DarkNextButton" Text="⏭" FontSize="17" WidthRequest="46" HeightRequest="46"
+                                Padding="0" CornerRadius="23" BackgroundColor="#1AFFFFFF" TextColor="White" Clicked="OnNext" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Grid>
+
+            <Grid x:Name="DarkChrome" ColumnDefinitions="44,*,44" ColumnSpacing="8" Margin="18,8,18,0"
+                  VerticalOptions="Start">
+                <Button x:Name="DarkBackButton" Text="‹" FontSize="22" WidthRequest="44" HeightRequest="44"
+                        Padding="0" CornerRadius="22" BackgroundColor="#33FFFFFF" TextColor="White" Clicked="OnBack" />
+                <Button x:Name="DarkSettingsButton" Grid.Column="2" Text="⚙" FontSize="18" WidthRequest="44"
+                        HeightRequest="44" Padding="0" CornerRadius="22" BackgroundColor="#33FFFFFF"
+                        TextColor="White" Clicked="OnSettings" />
+            </Grid>
+        </Grid>
+
+        <Grid x:Name="LightLayout" IsVisible="False" Opacity="0">
+            <Image x:Name="LightBackdropA" Aspect="AspectFill" Opacity="0" />
+            <Image x:Name="LightBackdropB" Aspect="AspectFill" Opacity="0" />
+            <Border x:Name="LightScrim" StrokeThickness="0" BackgroundColor="Transparent" />
+
+            <Grid x:Name="LightContent" Padding="18,54,18,10" RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="8">
+                <Border x:Name="LightCoverBorder" WidthRequest="168" HeightRequest="168"
+                        HorizontalOptions="Center" StrokeThickness="0" BackgroundColor="#E9E9EC" Padding="0"
+                        StrokeShape="RoundRectangle 18">
+                    <Border.Shadow>
+                        <Shadow Brush="Black" Opacity="0.25" Radius="26" Offset="0,12" />
+                    </Border.Shadow>
+                    <Grid>
+                        <Label x:Name="LightCoverPlaceholder" Text="♪" FontSize="54" TextColor="#33000000"
+                               HorizontalOptions="Center" VerticalOptions="Center" />
+                        <Image x:Name="LightCoverA" Aspect="AspectFill" />
+                        <Image x:Name="LightCoverB" Aspect="AspectFill" Opacity="0" />
+                        <Border x:Name="LightCoverMask" StrokeThickness="0" BackgroundColor="Transparent" />
+                    </Grid>
+                </Border>
+
+                <VerticalStackLayout x:Name="LightMeta" Grid.Row="1" Spacing="2">
+                    <Label x:Name="LightTitleLabel" FontSize="23" FontFamily="InterSemiBold" TextColor="#101013"
+                           HorizontalTextAlignment="Center" MaxLines="2" LineBreakMode="TailTruncation" />
+                    <Label x:Name="LightArtistLabel" FontSize="14" FontFamily="Inter" TextColor="#55555C"
+                           HorizontalTextAlignment="Center" MaxLines="1" LineBreakMode="TailTruncation" />
+                    <Label x:Name="LightAlbumLabel" FontSize="11" FontFamily="Inter" TextColor="#8A8A90"
+                           HorizontalTextAlignment="Center" MaxLines="1" LineBreakMode="TailTruncation" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout x:Name="LightTransport" Grid.Row="2" Spacing="6" Margin="0,2,0,0">
+                    <HorizontalStackLayout x:Name="LightTransportButtons" HorizontalOptions="Center" Spacing="16">
+                        <Button x:Name="LightPreviousButton" Text="⏮" FontSize="16" WidthRequest="42" HeightRequest="42"
+                                Padding="0" CornerRadius="21" BackgroundColor="#0F000000" TextColor="#101013" Clicked="OnPrevious" />
+                        <Button x:Name="LightPlayButton" Text="▶" FontSize="18" WidthRequest="42" HeightRequest="42"
+                                Padding="0" CornerRadius="21" BackgroundColor="#0F000000" TextColor="#101013" Clicked="OnPlayPause" />
+                        <Button x:Name="LightNextButton" Text="⏭" FontSize="16" WidthRequest="42" HeightRequest="42"
+                                Padding="0" CornerRadius="21" BackgroundColor="#0F000000" TextColor="#101013" Clicked="OnNext" />
+                    </HorizontalStackLayout>
+                    <Grid x:Name="LightProgress" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <Label x:Name="LightPositionLabel" FontSize="11" TextColor="#8A8A90" VerticalOptions="Center" />
+                        <Slider x:Name="LightPositionSlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0"
+                                MinimumTrackColor="#FF375F" MaximumTrackColor="#14000000" ThumbColor="#101013"
+                                DragStarted="OnSeekStart" DragCompleted="OnSeekEnd" />
+                        <Label x:Name="LightDurationLabel" Grid.Column="2" FontSize="11" TextColor="#8A8A90"
+                               VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+
+                <Grid x:Name="LightLyricsHost" Grid.Row="3" IsClippedToBounds="True">
+                    <Grid x:Name="LightVerseLayer">
+                        <Grid x:Name="LightScrollLayer" VerticalOptions="Start">
+                            <VerticalStackLayout x:Name="LightLyricsStack" Spacing="24" />
+                        </Grid>
+                    </Grid>
+                    <ScrollView x:Name="LightPlainScroll" IsVisible="False">
+                        <Label x:Name="LightPlainLabel" FontSize="18" LineHeight="1.5" TextColor="#55555C"
+                               LineBreakMode="WordWrap" />
+                    </ScrollView>
+                    <Label x:Name="LightStatusLabel" IsVisible="False" FontSize="19" TextColor="#55555C"
+                           HorizontalTextAlignment="Center" VerticalOptions="Center" LineBreakMode="WordWrap"
+                           HorizontalOptions="Center" MaximumWidthRequest="520" />
+                    <HorizontalStackLayout x:Name="LightDotsRow" IsVisible="False" Spacing="10"
+                                           HorizontalOptions="Center" VerticalOptions="Center" />
+                </Grid>
+            </Grid>
+
+            <Grid x:Name="LightChrome" ColumnDefinitions="44,*,44" ColumnSpacing="8" Margin="18,8,18,0"
+                  VerticalOptions="Start">
+                <Button x:Name="LightBackButton" Text="‹" FontSize="22" WidthRequest="44" HeightRequest="44"
+                        Padding="0" CornerRadius="22" BackgroundColor="#14000000" TextColor="#101013" Clicked="OnBack" />
+                <Button x:Name="LightSettingsButton" Grid.Column="2" Text="⚙" FontSize="18" WidthRequest="44"
+                        HeightRequest="44" Padding="0" CornerRadius="22" BackgroundColor="#14000000"
+                        TextColor="#101013" Clicked="OnSettings" />
+            </Grid>
+        </Grid>
+
+        <GraphicsView x:Name="ParticleView" InputTransparent="True" ZIndex="5" />
+    </Grid>
+</ContentPage>

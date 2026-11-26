@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="LyricGlow.Android.SettingsPage"
+             BackgroundColor="#08080A">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="16">
+            <Grid ColumnDefinitions="*,44">
+                <Label x:Name="TitleLabel" Text="" FontSize="26" FontFamily="OpenSansSemibold" TextColor="#F5F5F7" />
+                <Button x:Name="CloseButton" Grid.Column="1" Text="✕" FontSize="16" WidthRequest="44" HeightRequest="44"
+                        CornerRadius="22" BackgroundColor="#242429" TextColor="White" Clicked="OnClose" />
+            </Grid>
+
+            <Frame x:Name="AppearanceCard" CornerRadius="20" BackgroundColor="#121216" BorderColor="#22FFFFFF" Padding="16" HasShadow="False">
+                <VerticalStackLayout Spacing="12">
+                    <Label x:Name="AppearanceTitle" FontSize="16" FontFamily="OpenSansSemibold" TextColor="#F5F5F7" />
+                    <Label x:Name="LanguageLabel" FontSize="12" TextColor="#A8A8B0" />
+                    <Picker x:Name="LanguagePicker" Title="" TitleColor="#85858D" TextColor="White" BackgroundColor="#242429"
+                            SelectedIndexChanged="OnLanguageChanged" />
+                    <Label x:Name="PresetLabel" FontSize="12" TextColor="#A8A8B0" />
+                    <Picker x:Name="PresetPicker" Title="" TitleColor="#85858D" TextColor="White" BackgroundColor="#242429"
+                            SelectedIndexChanged="OnPresetChanged" />
+                    <Label x:Name="ThemeLabel" FontSize="12" TextColor="#A8A8B0" />
+                    <Picker x:Name="ThemePicker" Title="" TitleColor="#85858D" TextColor="White" BackgroundColor="#242429"
+                            SelectedIndexChanged="OnInterfaceThemeChanged" />
+                    <Label x:Name="LyricsSizeLabel" FontSize="12" TextColor="#A8A8B0" />
+                    <Grid ColumnDefinitions="*,44" ColumnSpacing="8">
+                        <Slider x:Name="LyricsSizeSlider" Minimum="70" Maximum="160" Value="100"
+                                MinimumTrackColor="#FF375F" ThumbColor="White" DragCompleted="OnLyricsSize" />
+                        <Label x:Name="LyricsSizeText" Grid.Column="1" FontSize="12" TextColor="#A8A8B0"
+                               HorizontalTextAlignment="End" VerticalOptions="Center" />
+                    </Grid>
+                    <Label x:Name="WordAnimationLabel" FontSize="12" TextColor="#A8A8B0" />
+                    <Picker x:Name="WordAnimationPicker" Title="" TitleColor="#85858D" TextColor="White" BackgroundColor="#242429"
+                            SelectedIndexChanged="OnWordAnimationChanged" />
+                    <Grid ColumnDefinitions="*,Auto" IsVisible="False">
+                        <VerticalStackLayout Spacing="2">
+                            <Label x:Name="AnimatedCoversLabel" FontSize="14" TextColor="#F5F5F7" />
+                            <Label x:Name="AnimatedCoversHint" FontSize="11" TextColor="#85858D" />
+                        </VerticalStackLayout>
+                        <Switch x:Name="AnimatedCoversSwitch" Grid.Column="1" VerticalOptions="Center"
+                                ThumbColor="White" OnColor="#FF375F" Toggled="OnAnimatedCovers" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Frame>
+
+            <Frame x:Name="LyricsCard" CornerRadius="20" BackgroundColor="#121216" BorderColor="#22FFFFFF" Padding="16" HasShadow="False">
+                <VerticalStackLayout Spacing="12">
+                    <Label x:Name="LyricsTitle" FontSize="16" FontFamily="OpenSansSemibold" TextColor="#F5F5F7" />
+                    <Label x:Name="SourceLabel" FontSize="12" TextColor="#A8A8B0" />
+                    <Picker x:Name="SourcePicker" Title="" TitleColor="#85858D" TextColor="White" BackgroundColor="#242429"
+                            SelectedIndexChanged="OnSourceChanged" />
+                    <Label x:Name="GlobalOffsetLabel" FontSize="12" TextColor="#A8A8B0" />
+                    <Slider x:Name="GlobalOffsetSlider" Minimum="-5" Maximum="5" Value="0" MinimumTrackColor="#FF375F"
+                            ThumbColor="White" DragCompleted="OnGlobalOffset" />
+                    <Label x:Name="TrackOffsetLabel" FontSize="12" TextColor="#A8A8B0" />
+                    <Slider x:Name="TrackOffsetSlider" Minimum="-5" Maximum="5" Value="0" MinimumTrackColor="#FF375F"
+                            ThumbColor="White" DragCompleted="OnTrackOffset" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <Frame x:Name="MotionCard" CornerRadius="20" BackgroundColor="#121216" BorderColor="#22FFFFFF" Padding="16" HasShadow="False">
+                <VerticalStackLayout Spacing="12">
+                    <Label x:Name="MotionTitle" FontSize="16" FontFamily="InterSemiBold" TextColor="#F5F5F7" />
+                    <Label x:Name="MotionIntensityLabel" FontSize="12" TextColor="#A8A8B0" />
+                    <Grid ColumnDefinitions="*,44" ColumnSpacing="8">
+                        <Slider x:Name="MotionIntensitySlider" Minimum="0" Maximum="100" Value="65"
+                                MinimumTrackColor="#FF375F" ThumbColor="White" DragCompleted="OnMotionIntensity" />
+                        <Label x:Name="MotionIntensityText" Grid.Column="1" FontSize="12" TextColor="#A8A8B0"
+                               HorizontalTextAlignment="End" VerticalOptions="Center" />
+                    </Grid>
+                    <Label x:Name="VerseTransitionLabel" FontSize="12" TextColor="#A8A8B0" />
+                    <Picker x:Name="VerseTransitionPicker" Title="" TitleColor="#85858D" TextColor="White"
+                            BackgroundColor="#242429" SelectedIndexChanged="OnVerseTransitionChanged" />
+                    <Label x:Name="CoverMotionLabel" FontSize="12" TextColor="#A8A8B0" />
+                    <Picker x:Name="CoverMotionPicker" Title="" TitleColor="#85858D" TextColor="White"
+                            BackgroundColor="#242429" SelectedIndexChanged="OnCoverMotionChanged" />
+                    <Label x:Name="EasingLabel" FontSize="12" TextColor="#A8A8B0" />
+                    <Picker x:Name="EasingPicker" Title="" TitleColor="#85858D" TextColor="White"
+                            BackgroundColor="#242429" SelectedIndexChanged="OnEasingChanged" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <Frame x:Name="UpdatesCard" CornerRadius="20" BackgroundColor="#121216" BorderColor="#22FFFFFF" Padding="16" HasShadow="False">
+                <VerticalStackLayout Spacing="12">
+                    <Label x:Name="UpdatesTitle" FontSize="16" FontFamily="OpenSansSemibold" TextColor="#F5F5F7" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label x:Name="AutoUpdateLabel" FontSize="13" TextColor="#F5F5F7" VerticalOptions="Center" />
+                        <Switch x:Name="AutoUpdateSwitch" Grid.Column="1" ThumbColor="White" OnColor="#FF375F"
+                                Toggled="OnAutoUpdate" />
+                    </Grid>
+                    <Label x:Name="UpdateHint" FontSize="11" TextColor="#85858D" LineBreakMode="WordWrap" />
+                </VerticalStackLayout>
+            </Frame>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

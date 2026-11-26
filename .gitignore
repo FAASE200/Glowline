@@ -1,0 +1,32 @@
+# Build output
+bin/
+obj/
+publish*/
+android-sdk/
+scratch/
+
+# Local QA and design artifacts
+.impeccable/
+preview/
+animframe.png
+.qa/
+
+# Secrets and signing material
+.secrets/
+*.token
+*.jks
+*.keystore
+*.pfx
+
+# Generated installers
+*.msi
+*.exe
+*.wixpdb
+*.wixobj
+*.wixout
+*.log
+**/installer/concepts/
+
+# IDE
+*.user
+.vs/
