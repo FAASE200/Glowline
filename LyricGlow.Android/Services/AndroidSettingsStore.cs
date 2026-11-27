@@ -16,7 +16,9 @@ public sealed class AndroidSettingsStore : IAppSettingsStore
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        MaxDepth = 32,
     };
+    const long MaxSettingsBytes = 2L * 1024 * 1024;
     readonly string _path = Path.Combine(FileSystem.AppDataDirectory, "settings.json");
     readonly SemaphoreSlim _gate = new(1, 1);
     CancellationTokenSource? _saveCts;
@@ -30,8 +32,17 @@ public sealed class AndroidSettingsStore : IAppSettingsStore
         {
             if (File.Exists(_path))
             {
-                var loaded = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_path), JsonOptions);
-                if (loaded is not null) Settings = loaded;
+                var info = new FileInfo(_path);
+                if (info.Length is > 0 and <= MaxSettingsBytes)
+                {
+                    var loaded = JsonSerializer.Deserialize<AppSettings>(
+                        File.ReadAllBytes(_path), JsonOptions);
+                    if (loaded is not null) Settings = loaded;
+                }
+                else if (info.Length > MaxSettingsBytes)
+                {
+                    Log.Write("Android settings: archivo excede el límite");
+                }
             }
         }
         catch (Exception ex)
@@ -66,6 +77,10 @@ public sealed class AndroidSettingsStore : IAppSettingsStore
         Settings.PerTrackOffsetMs ??= new();
         Settings.ManualOverrides ??= new();
         Settings.ActiveDesign ??= new DesignProfile();
+        Settings.LyricsFontFamily = CleanSetting(Settings.LyricsFontFamily, 128, "Segoe UI Variable Display");
+        Settings.LyricsFontWeight = CleanSetting(Settings.LyricsFontWeight, 32, "SemiBold");
+        TrimDictionary(Settings.PerTrackOffsetMs, 2000, 512);
+        TrimDictionary(Settings.ManualOverrides, 2000, 512);
         if (Settings.ActiveDesign.Layout == DesignLayout.Adaptive)
             PresetLibrary.Apply(Settings.ActiveDesign, Math.Clamp(Settings.MobilePresetIndex, 0, 4));
 
@@ -73,6 +88,8 @@ public sealed class AndroidSettingsStore : IAppSettingsStore
             Settings.LyricsSource = LyricSource.Lrcmux;
         if (!Enum.IsDefined(typeof(InterfaceTheme), Settings.InterfaceTheme))
             Settings.InterfaceTheme = InterfaceTheme.Dark;
+        if (!Enum.IsDefined(typeof(WordAnimationStyle), Settings.WordAnimation))
+            Settings.WordAnimation = WordAnimationStyle.Fade;
 
         var changed = false;
         if (Settings.SchemaVersion < 3)
@@ -82,7 +99,35 @@ public sealed class AndroidSettingsStore : IAppSettingsStore
             Settings.SchemaVersion = 3;
             changed = true;
         }
+        if (Settings.SchemaVersion < 4)
+        {
+            Settings.SoftwareRendering = false;
+            Settings.SchemaVersion = 4;
+            changed = true;
+        }
         return changed;
+    }
+
+    static string CleanSetting(string? value, int maxLength, string fallback)
+    {
+        var text = value?.Trim() ?? "";
+        if (text.Length == 0) return fallback;
+        return text.Length <= maxLength ? text : fallback;
+    }
+
+    static void TrimDictionary<T>(Dictionary<string, T> values, int maxEntries, int maxKeyChars)
+    {
+        var keys = new List<string>(values.Keys);
+        var kept = 0;
+        foreach (var key in keys)
+        {
+            if (string.IsNullOrWhiteSpace(key) || key.Length > maxKeyChars || kept >= maxEntries)
+            {
+                values.Remove(key);
+                continue;
+            }
+            kept++;
+        }
     }
 
     public void ScheduleSave()
@@ -110,6 +155,8 @@ public sealed class AndroidSettingsStore : IAppSettingsStore
         {
             Directory.CreateDirectory(FileSystem.AppDataDirectory);
             var temp = _path + ".tmp";
+            TrimDictionary(Settings.PerTrackOffsetMs, 2000, 512);
+            TrimDictionary(Settings.ManualOverrides, 2000, 512);
             await File.WriteAllTextAsync(temp, JsonSerializer.Serialize(Settings, JsonOptions), ct);
             File.Move(temp, _path, true);
         }

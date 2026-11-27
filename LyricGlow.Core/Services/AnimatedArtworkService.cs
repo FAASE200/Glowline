@@ -28,7 +28,10 @@ public sealed class AnimatedArtworkService
 {
     const string SearchUrl = "https://artwork.m8tec.top/api/v1/artwork/search";
     const long MaxVideoBytes = 30L * 1024 * 1024;
+    const long MaxPlaylistBytes = 1L * 1024 * 1024;
     static readonly TimeSpan NegativeTtl = TimeSpan.FromDays(7);
+    static readonly ExternalHostPolicy SearchHosts = ExternalHostPolicy.Of("m8tec.top");
+    static readonly ExternalHostPolicy MediaHosts = ExternalHostPolicy.Of("itunes.apple.com", "m8tec.top");
     static readonly HttpClient Http = CreateClient();
     static readonly Regex CodecAttr = new(@"CODECS=""([^""]+)""", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     static readonly Regex ResolutionAttr = new(@"RESOLUTION=(\d+)x(\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -96,7 +99,7 @@ public sealed class AnimatedArtworkService
     async Task<AnimatedCoverResult> ResolveAsync(TrackInfo track, string key, CancellationToken ct)
     {
         var path = VideoPath(key);
-        if (File.Exists(path) && new FileInfo(path).Length > 100_000)
+        if (File.Exists(path) && new FileInfo(path).Length > 100_000 && LooksLikeMp4(path))
         {
             return new AnimatedCoverResult { Path = path, Source = "m8tec" };
         }
@@ -111,7 +114,7 @@ public sealed class AnimatedArtworkService
         try
         {
             var search = $"{SearchUrl}?{SearchQuery(track)}";
-            using var resp = await Http.GetAsync(search, ct);
+            using var resp = await ExternalHttp.SendAsync(Http, SearchHosts.Require(search), SearchHosts, ct);
             if (resp.StatusCode == HttpStatusCode.NotFound)
             {
                 MarkNegative(key);
@@ -123,7 +126,10 @@ public sealed class AnimatedArtworkService
                 return new AnimatedCoverResult { ErrorKey = "AnimM8tecUnavailable" };
             }
 
-            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
+            using var doc = await ExternalHttp.ReadJsonAsync(resp, ExternalHttp.MaxJsonBytes, ct);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                throw new ExternalDataException("m8tec devolvió un objeto inesperado.");
+
             var masterUrl = GetString(doc.RootElement, "url");
             if (masterUrl.Length == 0)
             {
@@ -131,20 +137,20 @@ public sealed class AnimatedArtworkService
                 return new AnimatedCoverResult { ErrorKey = "CoverNoAnimation" };
             }
 
-            var masterUri = new Uri(masterUrl);
-            var master = await Http.GetStringAsync(masterUri, ct);
+            var masterUri = MediaHosts.Require(masterUrl);
+            var master = await ReadPlaylistAsync(masterUri, ct);
             var variant = PickAvcVariant(master, masterUri);
-            if (variant is null)
+            if (variant is null || !MediaHosts.Allows(variant.Value.Uri))
             {
-                Log.Write("animated: m8tec sin variante AVC");
+                Log.Write("animated: m8tec sin variante AVC válida");
                 return new AnimatedCoverResult { ErrorKey = "AnimHevcOnly" };
             }
 
-            var media = await Http.GetStringAsync(variant.Value.Uri, ct);
+            var media = await ReadPlaylistAsync(variant.Value.Uri, ct);
             var fileUri = FindMediaFile(media, variant.Value.Uri);
-            if (fileUri is null)
+            if (fileUri is null || !MediaHosts.Allows(fileUri))
             {
-                Log.Write("animated: m8tec sin archivo de video");
+                Log.Write("animated: m8tec sin archivo de video válido");
                 return new AnimatedCoverResult { ErrorKey = "AnimNoPlayableFile" };
             }
 
@@ -183,8 +189,23 @@ public sealed class AnimatedArtworkService
 
     internal readonly record struct HlsVariant(Uri Uri, int Width, int Height);
 
+    static async Task<string> ReadPlaylistAsync(Uri uri, CancellationToken ct)
+    {
+        using var resp = await ExternalHttp.SendAsync(Http, uri, MediaHosts, ct);
+        if (!resp.IsSuccessStatusCode)
+            throw new ExternalDataException($"Playlist HTTP {(int)resp.StatusCode}");
+        ExternalHttp.EnsureContentType(resp,
+            "application/vnd.apple.mpegurl", "application/x-mpegurl", "audio/mpegurl");
+        var text = await ExternalHttp.ReadStringAsync(resp, MaxPlaylistBytes, ct);
+        if (!text.StartsWith("#EXTM3U", StringComparison.Ordinal) ||
+            text.Count(ch => ch == '\n') > 20_000)
+            throw new ExternalDataException("Playlist HLS inválida.");
+        return text;
+    }
+
     internal static HlsVariant? PickAvcVariant(string master, Uri baseUri)
     {
+        if (master.Length > MaxPlaylistBytes) return null;
         var variants = new List<HlsVariant>();
         var lines = master.Split('\n');
         for (var i = 0; i < lines.Length; i++)
@@ -217,6 +238,7 @@ public sealed class AnimatedArtworkService
             catch
             {
             }
+            if (variants.Count >= 100) break;
         }
 
         if (variants.Count == 0) return null;
@@ -261,8 +283,11 @@ public sealed class AnimatedArtworkService
 
     static async Task<long> DownloadAsync(Uri uri, string path, CancellationToken ct)
     {
-        using var resp = await Http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!MediaHosts.Allows(uri)) return 0;
+        using var resp = await ExternalHttp.SendAsync(Http, uri, MediaHosts, ct);
         if (!resp.IsSuccessStatusCode) return 0;
+        ExternalHttp.EnsureContentType(resp, "video/mp4", "video/quicktime", "application/mp4",
+            "application/octet-stream");
         if (resp.Content.Headers.ContentLength is > MaxVideoBytes) return 0;
 
         await using var input = await resp.Content.ReadAsStreamAsync(ct);
@@ -553,8 +578,8 @@ public sealed class AnimatedArtworkService
     }
 
     internal static string SearchQuery(TrackInfo track) =>
-        $"artist={Uri.EscapeDataString(track.Artist)}" +
-        $"&album={Uri.EscapeDataString(track.Album)}";
+        $"artist={Uri.EscapeDataString(ExternalHttp.ClampQueryValue(track.Artist))}" +
+        $"&album={Uri.EscapeDataString(ExternalHttp.ClampQueryValue(track.Album))}";
 
     static string CacheKey(TrackInfo track) =>
         TrackKey.Normalize(track.Artist) + "|" + TrackKey.Normalize(track.Album);
@@ -613,13 +638,9 @@ public sealed class AnimatedArtworkService
 
     static string GetString(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString() ?? "" : "";
+            ? ExternalHttp.CleanText(value.GetString(), 4096) : "";
 
-    static HttpClient CreateClient()
-    {
-        var http = new HttpClient { Timeout = TimeSpan.FromSeconds(12) };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("LyricGlow/0.9.2 (personal Windows lyric overlay)");
-        http.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-        return http;
-    }
+    static HttpClient CreateClient() =>
+        ExternalHttp.CreateClient(TimeSpan.FromSeconds(12),
+            AppInfo.UserAgent, "application/json");
 }

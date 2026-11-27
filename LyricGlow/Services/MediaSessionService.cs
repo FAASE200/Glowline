@@ -13,6 +13,10 @@ namespace LyricGlow.Services;
 
 public sealed class MediaSessionService : IDisposable
 {
+    const int MaxMetaChars = 512;
+    const double MaxDurationSeconds = 24 * 60 * 60;
+    const long MaxThumbnailBytes = 20L * 1024 * 1024;
+
     readonly SettingsService _settings;
     readonly Dispatcher _dispatcher;
     readonly DispatcherTimer _poll;
@@ -209,13 +213,14 @@ public sealed class MediaSessionService : IDisposable
             }
 
             var raw = Math.Max(0, tl.Position.TotalSeconds);
+            if (!double.IsFinite(raw)) raw = 0;
             double end = tl.EndTime.TotalSeconds;
-            double? duration = end > 1 ? end : null;
+            double? duration = double.IsFinite(end) && end is > 1 and < MaxDurationSeconds ? end : null;
 
-            var title = _props?.Title ?? "";
-            var artist = _props?.Artist ?? "";
-            var album = _props?.AlbumTitle ?? "";
-            var source = _session.SourceAppUserModelId ?? "";
+            var title = CleanMeta(_props?.Title);
+            var artist = CleanMeta(_props?.Artist);
+            var album = CleanMeta(_props?.AlbumTitle);
+            var source = CleanMeta(_session.SourceAppUserModelId);
             var signature = $"{source}|{title}|{artist}|{album}|" +
                             (duration is > 0 ? ((int)Math.Round(duration.Value)).ToString() : "-");
 
@@ -244,7 +249,9 @@ public sealed class MediaSessionService : IDisposable
                 PlaybackStatus = pb.PlaybackStatus.ToString(),
                 SourceAppId = source,
                 CapturedAt = now,
-                RawTimelinePosition = tl.Position,
+                RawTimelinePosition = tl.Position >= TimeSpan.Zero && raw <= MaxDurationSeconds
+                    ? tl.Position
+                    : TimeSpan.Zero,
                 TimelineLastUpdated = tl.LastUpdatedTime,
             };
             LastSnapshot = snap;
@@ -297,15 +304,15 @@ public sealed class MediaSessionService : IDisposable
             var props = _props;
             if (props is null) return null;
             if (expectedTitle is not null &&
-                !string.Equals(props.Title ?? "", expectedTitle, StringComparison.Ordinal)) return null;
+                !string.Equals(CleanMeta(props.Title), expectedTitle, StringComparison.Ordinal)) return null;
             if (expectedArtist is not null &&
-                !string.Equals(props.Artist ?? "", expectedArtist, StringComparison.Ordinal)) return null;
+                !string.Equals(CleanMeta(props.Artist), expectedArtist, StringComparison.Ordinal)) return null;
 
             var thumb = props.Thumbnail;
             if (thumb is null) return null;
             using var stream = await thumb.OpenReadAsync();
             var size = (uint)stream.Size;
-            if (size == 0) return null;
+            if (size == 0 || size > MaxThumbnailBytes) return null;
             using var reader = new DataReader(stream.GetInputStreamAt(0));
             await reader.LoadAsync(size);
             var bytes = new byte[(int)size];
@@ -316,6 +323,12 @@ public sealed class MediaSessionService : IDisposable
         {
             return null;
         }
+    }
+
+    static string CleanMeta(string? value)
+    {
+        var text = value ?? "";
+        return text.Length <= MaxMetaChars ? text : text[..MaxMetaChars];
     }
 
     public async Task TogglePlayPauseAsync()

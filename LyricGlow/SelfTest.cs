@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -131,7 +132,7 @@ internal static class SelfTest
             Check(new AppSettings().LyricsSource == LyricSource.Lrcmux, "default lyric source is Lrcmux");
             Check(new AppSettings().InterfaceTheme == InterfaceTheme.Dark, "default interface theme is Dark");
             Check(new AppSettings().InterfaceGlassEnabled, "translucent interface is enabled by default");
-            Check(new AppSettings().Language == AppLanguage.Spanish, "default language is Spanish");
+            Check(new AppSettings().Language == AppLanguage.English, "default language is English");
             Check(new AppSettings().CoverPaletteEnabled, "cover palette is enabled by default");
             var appDirectory = Path.GetFullPath(AppContext.BaseDirectory);
             var dataDirectory = Path.GetFullPath(SettingsService.DataDir);
@@ -255,6 +256,7 @@ internal static class SelfTest
                   "product": "LyricGlow",
                   "version": "9.9.9",
                   "tag": "v9.9.9",
+                  "notes": "Fixed bugs and improvements",
                   "assets": [
                     { "Name": "LyricGlow.exe", "Size": 123, "Sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
                   ]
@@ -263,6 +265,8 @@ internal static class SelfTest
             var manifest = ReleaseClient.ParseManifest(manifestJson);
             Check(manifest.Version == new Version(9, 9, 9) && manifest.Tag == "v9.9.9",
                 "public update manifest parses version and tag");
+            Check(manifest.Notes == "Fixed bugs and improvements",
+                "public update manifest parses release notes");
             Check(manifest.Assets.Count == 1 &&
                   manifest.Assets[0].DownloadUrl == "https://github.com/FAASE200/Glowline/releases/download/v9.9.9/LyricGlow.exe" &&
                   ReleaseClient.IsSha256Digest(manifest.Assets[0].Digest),
@@ -274,6 +278,7 @@ internal static class SelfTest
             var missing = Loc.MissingKeys();
             Check(missing.Count == 0,
                 $"localization dictionaries complete (missing {missing.Count}: {string.Join(", ", missing.Take(5))})");
+            Loc.SetLanguage(AppLanguage.Spanish);
             var spanishLabel = Loc.T("Language");
             Check(spanishLabel == "Idioma", $"Spanish dictionary is active (got '{spanishLabel}', culture {Loc.Culture.Name})");
             Check(Loc.T("Designer.Value.LyricAnimation.Pulse") == "Pulso" &&
@@ -391,6 +396,151 @@ internal static class SelfTest
                 "timeline pause uses raw");
             Check(Math.Abs(smoother.Update(60, true, t0.AddSeconds(8), t0.AddSeconds(8), "web") - 60) < 0.05,
                 "timeline resumes from raw");
+
+            Check(!new AppSettings().SoftwareRendering, "software rendering is off by default");
+
+            var hostPolicy = ExternalHostPolicy.Of("example.com");
+            Check(hostPolicy.Allows(new Uri("https://api.example.com/path")),
+                "external policy accepts an allowlisted subdomain");
+            Check(!hostPolicy.Allows(new Uri("http://api.example.com/path")),
+                "external policy rejects plain HTTP");
+            Check(!hostPolicy.Allows(new Uri("https://example.com.evil.test/path")),
+                "external policy rejects lookalike hosts");
+            Check(!hostPolicy.Allows(new Uri("https://user:pw@example.com/path")),
+                "external policy rejects URL credentials");
+            Check(!hostPolicy.Allows(new Uri("https://example.com:8443/path")),
+                "external policy rejects non-default ports");
+            Check(ExternalHttp.IsJsonMediaType("application/json") &&
+                  ExternalHttp.IsJsonMediaType("application/problem+json") &&
+                  !ExternalHttp.IsJsonMediaType("text/javascript") &&
+                  ExternalHttp.IsJsonMediaType("text/javascript", allowJavaScript: true),
+                "external content types accept only JSON (plus the iTunes exception)");
+            using (var wrongType = new HttpResponseMessage
+                   {
+                       Content = new StringContent("{}", Encoding.UTF8, "text/html"),
+                   })
+            {
+                var rejectedType = false;
+                try { ExternalHttp.EnsureJsonContentType(wrongType); }
+                catch (ExternalDataException) { rejectedType = true; }
+                Check(rejectedType, "external JSON rejects HTML responses");
+            }
+            using (var oversized = new HttpResponseMessage
+                   {
+                       Content = new ByteArrayContent(new byte[128]),
+                   })
+            {
+                var rejectedSize = false;
+                try
+                {
+                    ExternalHttp.ReadBytesAsync(oversized, 64, CancellationToken.None)
+                        .GetAwaiter().GetResult();
+                }
+                catch (ExternalDataException) { rejectedSize = true; }
+                Check(rejectedSize, "external reader rejects oversized bodies");
+            }
+
+            Check(LrcParser.Parse(new string('x', 512 * 1024 + 1)).Count == 0,
+                "parser rejects oversized LRC input");
+            var hostileTime = LrcParser.Parse("[9999:99.99]Clamped");
+            Check(hostileTime.Count == 1 && Math.Abs(hostileTime[0].Time - 86400) < 0.01,
+                "parser clamps hostile timestamps to 24h");
+            var manyLrc = new StringBuilder();
+            for (var i = 0; i < 6001; i++) manyLrc.Append("[00:01.00]line\n");
+            Check(LrcParser.Parse(manyLrc.ToString()).Count == 0,
+                "parser rejects LRC with too many lines");
+            var manyWords = new StringBuilder("[00:01.00]");
+            for (var i = 0; i < 501; i++) manyWords.Append("<0:0>w");
+            var manyWordsLines = LrcParser.Parse(manyWords.ToString());
+            Check(manyWordsLines.Count == 1 && manyWordsLines[0].Words is null,
+                "parser drops word timing above the cap");
+            Check(LyricsFileParser.Parse(new string(' ', 512 * 1024 + 1)) is null,
+                "lyricsfile parser rejects oversized input");
+
+            var lrcmuxValid = LrcmuxClient.TrackFromJson("""
+{"track":{"title":"Song","artist":"Artist","duration":180},"lines":[{"text":"Hello ","start":1000,"words":[{"text":"Hello ","start":1000},{"text":"world","start":1500}]}]}
+""", "Fallback", "Fallback");
+            Check(lrcmuxValid is { HasWordSync: true } &&
+                  LrcParser.Parse(lrcmuxValid.SyncedLyrics!).Count == 1,
+                "Lrcmux accepts a valid word-synced payload");
+            var lrcmuxSpaced = LrcmuxClient.TrackFromJson("""
+{"lines":[{"text":"Now he's thinkin'","start":0,"words":[{"text":"Now","start":0},{"text":"he's","start":500},{"text":"thinkin'","start":1000}]}]}
+""", "Fallback", "Fallback");
+            var lrcmuxSpacedLines = LrcParser.Parse(lrcmuxSpaced?.SyncedLyrics ?? "");
+            Check(lrcmuxSpacedLines.Count == 1 && lrcmuxSpacedLines[0].Text == "Now he's thinkin'" &&
+                  lrcmuxSpacedLines[0].Words is { Count: 3 } &&
+                  string.Concat(lrcmuxSpacedLines[0].Words!.Select(w => w.Text)) == "Now he's thinkin'",
+                "Lrcmux restores spaces between word tokens");
+            Check(LrcmuxClient.TrackFromJson("""
+{"lines":[{"text":"x","start":90000000}]}
+""", "Fallback", "Fallback") is null,
+                "Lrcmux rejects timestamps beyond 24h");
+            var lrcmuxMany = new StringBuilder("{\"lines\":[");
+            for (var i = 0; i < 6001; i++)
+            {
+                if (i > 0) lrcmuxMany.Append(',');
+                lrcmuxMany.Append("{\"text\":\"x\",\"start\":").Append(i * 10).Append('}');
+            }
+            lrcmuxMany.Append("]}");
+            Check(LrcmuxClient.TrackFromJson(lrcmuxMany.ToString(), "Fallback", "Fallback") is null,
+                "Lrcmux rejects payloads with too many lines");
+            var lrcmuxWords = new StringBuilder("{\"lines\":[{\"text\":\"x\",\"start\":0,\"words\":[");
+            for (var i = 0; i < 501; i++)
+            {
+                if (i > 0) lrcmuxWords.Append(',');
+                lrcmuxWords.Append("{\"text\":\"w\",\"start\":").Append(i).Append('}');
+            }
+            lrcmuxWords.Append("]}]}");
+            Check(LrcmuxClient.TrackFromJson(lrcmuxWords.ToString(), "Fallback", "Fallback") is null,
+                "Lrcmux rejects lines with too many words");
+
+            Check(LyricsPlusClient.TrackFromJson("""
+{"lyrics":[{"time":1000000000000,"text":"Hostile"}]}
+""", "Fallback", "Fallback") is null,
+                "LyricsPlus rejects timestamps beyond 24h");
+            var plusMany = new StringBuilder("{\"lyrics\":[");
+            for (var i = 0; i < 6001; i++)
+            {
+                if (i > 0) plusMany.Append(',');
+                plusMany.Append("{\"time\":").Append(i * 10).Append(",\"text\":\"x\"}");
+            }
+            plusMany.Append("]}");
+            Check(LyricsPlusClient.TrackFromJson(plusMany.ToString(), "Fallback", "Fallback") is null,
+                "LyricsPlus rejects payloads with too many lines");
+            var plusLongSyllable = "{\"lyrics\":[{\"time\":0,\"text\":\"x\",\"syllabus\":[{\"time\":0,\"text\":\"" +
+                                   new string('s', 513) + "\"}]}]}";
+            Check(LyricsPlusClient.TrackFromJson(plusLongSyllable, "Fallback", "Fallback") is null,
+                "LyricsPlus rejects oversized syllables");
+
+            Check(!LrcLibClient.ValidateTrack(new LrclibTrack
+                  {
+                      SyncedLyrics = new string('x', 512 * 1024 + 1),
+                  }),
+                "LRCLIB rejects lyrics above the size cap");
+            Check(LrcLibClient.ValidateTrack(new LrclibTrack
+                  {
+                      TrackName = "Song",
+                      ArtistName = "Artist",
+                      SyncedLyrics = "[00:01.00]Line",
+                  }),
+                "LRCLIB accepts a valid track");
+            Check(CoverArtService.IsAcceptableImageSize(4096, 4096) &&
+                  !CoverArtService.IsAcceptableImageSize(4097, 100) &&
+                  !CoverArtService.IsAcceptableImageSize(10000, 100),
+                "cover art rejects oversized dimensions");
+
+            var tooManyAssets = new StringBuilder(
+                "{\"version\":\"9.9.9\",\"tag\":\"v9.9.9\",\"assets\":[");
+            for (var i = 0; i < 65; i++)
+            {
+                if (i > 0) tooManyAssets.Append(',');
+                tooManyAssets.Append("{\"name\":\"a").Append(i).Append("\"}");
+            }
+            tooManyAssets.Append("]}");
+            var rejectedAssets = false;
+            try { ReleaseClient.ParseManifest(tooManyAssets.ToString()); }
+            catch (InvalidDataException) { rejectedAssets = true; }
+            Check(rejectedAssets, "update manifest rejects too many assets");
         }
         catch (Exception ex)
         {

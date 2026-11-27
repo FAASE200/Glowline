@@ -99,7 +99,7 @@ public sealed class WordHighlightLine
                     var motion = new WordMotion(child);
                     if (Style == WordAnimationStyle.Blur)
                     {
-                        motion.Blur = new BlurEffect { Radius = 0, RenderingBias = RenderingBias.Quality };
+                        motion.Blur = new BlurEffect { Radius = 0, RenderingBias = RenderingBias.Performance };
                         child.Effect = motion.Blur;
                     }
                     _motions.Add(motion);
@@ -119,6 +119,8 @@ public sealed class WordHighlightLine
 
         if (line is not null && line.Background.Length > 0)
             AppendBackground(line);
+        if (line is not null)
+            LyricRender.AppendRomanized(_target, line, BackgroundColor);
     }
 
     void AppendBackground(LrcLine line)

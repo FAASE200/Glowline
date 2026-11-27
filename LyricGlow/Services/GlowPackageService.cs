@@ -316,7 +316,7 @@ public static class GlowPackageService
     static DesignProfile ParseManifest(string json)
     {
         JsonDocument doc;
-        try { doc = JsonDocument.Parse(json); }
+        try { doc = JsonDocument.Parse(json, ExternalHttp.JsonOptions); }
         catch (JsonException ex)
         {
             throw new InvalidDataException("El manifiesto no es JSON válido.", ex);

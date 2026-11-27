@@ -1,0 +1,51 @@
+name: Bug report
+description: Something isn't working as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem! Please fill in as much as you can.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Play "Song" by "Artist" in Spotify
+        2. Open the full-screen view
+        3. ...
+  - type: input
+    id: version
+    attributes:
+      label: Glowline version
+      description: Shown in Settings → Updates.
+      placeholder: "0.9.21"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - Android
+    validations:
+      required: true
+  - type: input
+    id: player
+    attributes:
+      label: Music player
+      placeholder: Spotify, Apple Music, YouTube Music in Edge...
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Drag and drop `%LOCALAPPDATA%\LyricGlow\log.txt` here (and `log.old.txt` if it exists).

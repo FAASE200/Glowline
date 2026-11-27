@@ -14,21 +14,33 @@ public sealed class TrackInfo
     public double? DurationSeconds { get; init; }
     public string SourceAppId { get; init; } = "";
 
-    public string Key => TrackKey.Make(Artist, Title, DurationSeconds);
+    string? _key;
+
+    // Computed once: the full-screen view reads it every frame (per-track
+    // offset) and normalizing it with a regex is not free.
+    public string Key => _key ??= TrackKey.Make(Artist, Title, DurationSeconds);
 
     public string DisplayName => Artist.Length > 0 ? $"{Artist} — {Title}" : Title;
 }
 
 public static class TrackKey
 {
+    static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
+
     public static string Make(string artist, string title, double? durationSeconds)
     {
-        var d = durationSeconds is > 0 ? ((int)Math.Round(durationSeconds.Value)).ToString() : "0";
+        var d = durationSeconds is > 0 and < 86400
+            ? ((int)Math.Round(durationSeconds.Value)).ToString()
+            : "0";
         return $"{Normalize(artist)}|{Normalize(title)}|{d}";
     }
 
-    public static string Normalize(string? s) =>
-        Regex.Replace((s ?? "").Trim().ToLowerInvariant(), @"\s+", " ");
+    public static string Normalize(string? s)
+    {
+        var text = s ?? "";
+        if (text.Length > 1024) text = text[..1024];
+        return Whitespace.Replace(text.Trim().ToLowerInvariant(), " ");
+    }
 }
 
 public sealed class LrcLine
@@ -38,6 +50,10 @@ public sealed class LrcLine
     public string Background { get; init; } = "";
     public IReadOnlyList<LrcWord>? Words { get; init; }
     public IReadOnlyList<LrcWord>? BackgroundWords { get; init; }
+    /// <summary>Pronunciation in Latin letters (empty when not applicable).</summary>
+    public string Romanized { get; init; } = "";
+    /// <summary>Original time from the source, before per-line adjustments.</summary>
+    public double SourceTime { get; init; } = double.NaN;
 }
 
 public sealed class LrcWord
@@ -59,6 +75,8 @@ public sealed class LrclibTrack
     [JsonPropertyName("syncedLyrics")] public string? SyncedLyrics { get; set; }
     [JsonPropertyName("lyricsfile")] public string? LyricsFile { get; set; }
     public string Source { get; set; } = "LRCLIB";
+    /// <summary>Service that provided the lyrics (LRCLIB, Lrcmux or LyricsPlus).</summary>
+    [JsonPropertyName("provider")] public string Provider { get; set; } = "";
 
     [JsonIgnore] public bool HasSynced => !string.IsNullOrWhiteSpace(SyncedLyrics);
     [JsonIgnore] public bool HasPlain => !string.IsNullOrWhiteSpace(PlainLyrics);
@@ -97,7 +115,7 @@ public sealed class AppSettings
     public Dictionary<string, int> PerTrackOffsetMs { get; set; } = new();
     public Dictionary<string, long> ManualOverrides { get; set; } = new();
     public string? PreferredSourceAppId { get; set; }
-    public bool SoftwareRendering { get; set; } = true;
+    public bool SoftwareRendering { get; set; }
     public bool CoverPaletteEnabled { get; set; } = true;
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public InterfaceTheme InterfaceTheme { get; set; } = InterfaceTheme.Dark;
@@ -118,7 +136,21 @@ public sealed class AppSettings
     public string LyricsFontWeight { get; set; } = "SemiBold";
     public int AnimationSoftness { get; set; } = 50;
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public AppLanguage Language { get; set; } = AppLanguage.Spanish;
+    public AppLanguage Language { get; set; } = AppLanguage.English;
     public DesignProfile? ActiveDesign { get; set; }
     public int MobilePresetIndex { get; set; } = 1;
+
+    // ---- 0.9.40 ----
+    /// <summary>Per-line timing: track → (original time in ms → offset in ms).</summary>
+    public Dictionary<string, Dictionary<string, int>> PerLineOffsetMs { get; set; } = new();
+    /// <summary>Lyrics picked by hand from Lrcmux or LyricsPlus (track → provider).</summary>
+    public Dictionary<string, string> ManualPins { get; set; } = new();
+    public bool RomanizationEnabled { get; set; }
+    public bool MiniLyricsEnabled { get; set; }
+    public double? MiniLyricsLeft { get; set; }
+    public double? MiniLyricsTop { get; set; }
+    public bool GlobalHotkeysEnabled { get; set; } = true;
+    public bool ObsOverlayEnabled { get; set; }
+    public int ObsOverlayPort { get; set; } = 7531;
+    public bool DiscordPresenceEnabled { get; set; }
 }

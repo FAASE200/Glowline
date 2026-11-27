@@ -679,15 +679,21 @@
                             <TextBlock Text="{loc:T General}" Style="{StaticResource RailLabel}"/>
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource IndexButton}" Tag="SectionUpdates" Click="JumpToSection_Click">
+                    <Button Style="{StaticResource IndexButton}" Tag="SectionExtras" Click="JumpToSection_Click">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="10" Style="{StaticResource SectionNumber}"/>
+                            <TextBlock Text="{loc:T ExtrasTitle}" Style="{StaticResource RailLabel}"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource IndexButton}" Tag="SectionUpdates" Click="JumpToSection_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="11" Style="{StaticResource SectionNumber}"/>
                             <TextBlock Text="{loc:T UpdatesTitle}" Style="{StaticResource RailLabel}"/>
                         </StackPanel>
                     </Button>
                     <Button Style="{StaticResource IndexButton}" Tag="SectionDiagnostics" Click="JumpToSection_Click">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="11" Style="{StaticResource SectionNumber}"/>
+                            <TextBlock Text="12" Style="{StaticResource SectionNumber}"/>
                             <TextBlock Text="{loc:T DiagnosticsTitle}" Style="{StaticResource RailLabel}"/>
                         </StackPanel>
                     </Button>
@@ -749,24 +755,21 @@
                             </StackPanel>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
                                 <Button x:Name="PrevButton" Style="{StaticResource GlyphButton}" Click="Prev_Click">
-                                    <Path Data="M 1,3 L 1,13 M 11,3 L 3,8 L 11,13 Z"
+                                    <Path Data="M 4,4.4 L 6.4,4.4 L 6.4,19.6 L 4,19.6 Z M 19.6,4.4 L 7.8,12 L 19.6,19.6 Z"
                                           Fill="{DynamicResource Muted}" Stroke="{DynamicResource Muted}"
-                                          StrokeThickness="1.2" Width="12" Height="14" Stretch="Uniform"/>
+                                          StrokeThickness="1.1" StrokeLineJoin="Round"
+                                          Width="13" Height="14" Stretch="Uniform"/>
                                 </Button>
                                 <Button x:Name="PlayPauseButton" Style="{StaticResource GlyphButton}"
                                         Margin="4,0" Click="Play_Click">
-                                    <Grid>
-                                        <Path x:Name="PlayGlyph" Data="M 3,2 L 13,8 L 3,14 Z"
-                                              Fill="{DynamicResource Ink}" Width="12" Height="14" Stretch="Uniform"/>
-                                        <Path x:Name="PauseGlyph" Data="M 3,2 L 6,2 L 6,14 L 3,14 Z M 9,2 L 12,2 L 12,14 L 9,14 Z"
-                                              Fill="{DynamicResource Ink}" Width="12" Height="14" Stretch="Uniform"
-                                              Visibility="Collapsed"/>
-                                    </Grid>
+                                    <controls:PlayPauseIcon x:Name="PlayPauseIcon" Width="14" Height="16"
+                                                            Foreground="{DynamicResource Ink}"/>
                                 </Button>
                                 <Button x:Name="NextButton" Style="{StaticResource GlyphButton}" Click="Next_Click">
-                                    <Path Data="M 11,3 L 11,13 M 1,3 L 9,8 L 1,13 Z"
+                                    <Path Data="M 20,4.4 L 17.6,4.4 L 17.6,19.6 L 20,19.6 Z M 4.4,4.4 L 16.2,12 L 4.4,19.6 Z"
                                           Fill="{DynamicResource Muted}" Stroke="{DynamicResource Muted}"
-                                          StrokeThickness="1.2" Width="12" Height="14" Stretch="Uniform"/>
+                                          StrokeThickness="1.1" StrokeLineJoin="Round"
+                                          Width="13" Height="14" Stretch="Uniform"/>
                                 </Button>
                             </StackPanel>
                         </Grid>
@@ -962,6 +965,12 @@
                             </WrapPanel>
                             <TextBlock Text="{loc:T OffsetExplanation}" Foreground="{DynamicResource Faint}"
                                        FontSize="11" Margin="26,10,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="{loc:T LineOffsetHint}" Foreground="{DynamicResource Faint}"
+                                       FontSize="11" Margin="26,6,0,0" TextWrapping="Wrap"/>
+                            <CheckBox x:Name="RomanizationCheck" Content="{loc:T Romanization}"
+                                      Margin="26,16,0,0" Checked="Romanization_Changed" Unchecked="Romanization_Changed"/>
+                            <TextBlock Text="{loc:T RomanizationHint}" Foreground="{DynamicResource Faint}"
+                                       FontSize="11" Margin="26,4,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
 
@@ -1200,11 +1209,60 @@
                         </StackPanel>
                     </Border>
 
-                    <Border x:Name="SectionUpdates" Style="{StaticResource Section}">
+                    <Border x:Name="SectionExtras" Style="{StaticResource Section}">
                         <StackPanel>
                             <Grid>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="10" Style="{StaticResource SectionNumber}"/>
+                                    <TextBlock Text="{loc:T ExtrasTitle}" Style="{StaticResource SectionTitle}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <CheckBox x:Name="MiniLyricsCheck" Content="{loc:T MiniLyrics}"
+                                      Margin="26,16,0,0" Checked="MiniLyrics_Changed" Unchecked="MiniLyrics_Changed"/>
+                            <TextBlock Text="{loc:T MiniLyricsHint}" Foreground="{DynamicResource Faint}"
+                                       FontSize="11" Margin="26,4,0,0" TextWrapping="Wrap"/>
+
+                            <CheckBox x:Name="HotkeysCheck" Content="{loc:T GlobalHotkeys}"
+                                      Margin="26,16,0,0" Checked="Hotkeys_Changed" Unchecked="Hotkeys_Changed"/>
+                            <TextBlock x:Name="HotkeysList" Foreground="{DynamicResource Muted}"
+                                       FontSize="11.5" LineHeight="18" Margin="26,6,0,0" TextWrapping="Wrap"/>
+
+                            <Grid Margin="26,18,0,0">
+                                <TextBlock Text="{loc:T ShareTitle}" Foreground="{DynamicResource Ink}"
+                                           FontSize="12" VerticalAlignment="Center"/>
+                                <Button Content="{loc:T ShareOpenFolder}" Style="{StaticResource SmallButton}"
+                                        HorizontalAlignment="Right" Click="ShareFolder_Click"/>
+                            </Grid>
+                            <TextBlock Text="{loc:T ShareHint}" Foreground="{DynamicResource Faint}"
+                                       FontSize="11" Margin="26,4,0,0" TextWrapping="Wrap"/>
+
+                            <CheckBox x:Name="ObsCheck" Content="{loc:T ObsOverlay}"
+                                      Margin="26,18,0,0" Checked="Obs_Changed" Unchecked="Obs_Changed"/>
+                            <Grid Margin="26,8,0,0">
+                                <TextBlock x:Name="ObsUrlText" Text="" Foreground="{DynamicResource Muted}"
+                                           FontSize="12" VerticalAlignment="Center"
+                                           FontFamily="Cascadia Mono, Consolas"/>
+                                <Button x:Name="ObsCopyButton" Content="{loc:T ObsCopyLink}"
+                                        Style="{StaticResource SmallButton}" HorizontalAlignment="Right"
+                                        Click="ObsCopy_Click"/>
+                            </Grid>
+                            <TextBlock Text="{loc:T ObsOverlayHint}" Foreground="{DynamicResource Faint}"
+                                       FontSize="11" Margin="26,6,0,0" TextWrapping="Wrap"/>
+
+                            <CheckBox x:Name="DiscordCheck" Content="{loc:T DiscordPresence}"
+                                      Margin="26,18,0,0" Checked="Discord_Changed" Unchecked="Discord_Changed"/>
+                            <TextBlock x:Name="DiscordHint" Text="{loc:T DiscordPresenceHint}"
+                                       Foreground="{DynamicResource Faint}"
+                                       FontSize="11" Margin="26,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border x:Name="SectionUpdates" Style="{StaticResource Section}">
+                        <StackPanel>
+                            <Grid>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="11" Style="{StaticResource SectionNumber}"/>
                                     <TextBlock Text="{loc:T UpdatesTitle}" Style="{StaticResource SectionTitle}"/>
                                 </StackPanel>
                             </Grid>
@@ -1217,12 +1275,31 @@
                             </Grid>
                             <CheckBox x:Name="AutoUpdateCheck" Content="{loc:T AutoUpdateCheckbox}"
                                       Margin="26,14,0,0" Checked="AutoUpdate_Changed" Unchecked="AutoUpdate_Changed"/>
+                            <Button x:Name="UpdateStarButton" Content="{loc:T StarOnGitHub}"
+                                    Style="{StaticResource SmallButton}" HorizontalAlignment="Left"
+                                    Margin="26,12,0,0" Click="UpdateStar_Click"/>
                             <ProgressBar x:Name="UpdateProgress" Style="{StaticResource UpdateProgress}"
                                          Minimum="0" Maximum="100" Value="0" Margin="26,12,0,0"
                                          Visibility="Collapsed"/>
                             <TextBlock x:Name="UpdateStatusText" Text="{loc:T UpdateNotChecked}"
                                        Foreground="{DynamicResource Faint}" FontSize="11" Margin="26,8,0,0"
                                        TextWrapping="Wrap"/>
+                            <Border x:Name="UpdateNotesBorder" Margin="26,12,0,0" Padding="14,12"
+                                    Background="{DynamicResource Hover}" BorderBrush="{DynamicResource Line}"
+                                    BorderThickness="1" CornerRadius="2" Visibility="Collapsed">
+                                <StackPanel>
+                                    <TextBlock x:Name="UpdateNotesTitle" Text=""
+                                               Foreground="{DynamicResource Ink}" FontSize="12"
+                                               FontWeight="SemiBold"/>
+                                    <ScrollViewer MaxHeight="190" Margin="0,8,0,0"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled">
+                                        <TextBlock x:Name="UpdateNotesText" Text=""
+                                                   Foreground="{DynamicResource Muted}" FontSize="11.5"
+                                                   LineHeight="17" TextWrapping="Wrap"/>
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </Border>
                             <Button x:Name="UpdateInstallButton" Content="{loc:T RestartAndInstall}"
                                     Style="{StaticResource AccentButton}" HorizontalAlignment="Left"
                                     Margin="26,12,0,0" Visibility="Collapsed" Click="UpdateInstall_Click"/>
@@ -1234,7 +1311,7 @@
                             <Expander x:Name="DiagExpander" Style="{StaticResource DiagExpanderStyle}">
                                 <Expander.Header>
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="11" Style="{StaticResource SectionNumber}"/>
+                                        <TextBlock Text="12" Style="{StaticResource SectionNumber}"/>
                                         <TextBlock Text="{loc:T DiagnosticsTitle}" Style="{StaticResource SectionTitle}"/>
                                     </StackPanel>
                                 </Expander.Header>

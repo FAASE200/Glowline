@@ -14,6 +14,12 @@ namespace LyricGlow.Android.Services;
 
 public sealed class AndroidSessionService : IDisposable
 {
+    const int MaxMetaChars = 512;
+    const double MaxDurationSeconds = 24 * 60 * 60;
+    const long MaxArtworkBytes = 40L * 1024 * 1024;
+    const int MaxArtworkSide = 4096;
+    const long MaxArtworkPixels = 16L * 1024 * 1024;
+
     readonly Context _context;
     readonly MediaSessionManager _manager;
     readonly Handler _handler;
@@ -102,7 +108,10 @@ public sealed class AndroidSessionService : IDisposable
         var artist = Text(metadata, MediaMetadata.MetadataKeyArtist);
         var album = Text(metadata, MediaMetadata.MetadataKeyAlbum);
         var duration = Number(metadata, MediaMetadata.MetadataKeyDuration) / 1000.0;
-        var raw = Math.Max(0, (state?.Position ?? 0) / 1000.0);
+        if (!double.IsFinite(duration) || duration < 0 || duration > MaxDurationSeconds) duration = 0;
+        var rawMs = state?.Position ?? 0;
+        if (rawMs < 0 || rawMs > (long)MaxDurationSeconds * 1000) rawMs = 0;
+        var raw = Math.Max(0, rawMs / 1000.0);
         var speed = state?.PlaybackSpeed ?? 0;
         var playing = state?.State is PlaybackStateCode.Playing or PlaybackStateCode.FastForwarding
             or PlaybackStateCode.Rewinding or PlaybackStateCode.Buffering
@@ -132,13 +141,16 @@ public sealed class AndroidSessionService : IDisposable
             PlaybackStatus = playing ? "Playing" : "Paused",
             SourceAppId = controller.PackageName ?? "",
             CapturedAt = DateTimeOffset.Now,
-            RawTimelinePosition = TimeSpan.FromMilliseconds(state?.Position ?? 0),
+            RawTimelinePosition = TimeSpan.FromMilliseconds(rawMs),
             TimelineLastUpdated = DateTimeOffset.Now,
         };
     }
 
-    static string Text(MediaMetadata? metadata, string key) =>
-        metadata?.GetString(key)?.Trim() ?? "";
+    static string Text(MediaMetadata? metadata, string key)
+    {
+        var text = metadata?.GetString(key)?.Trim() ?? "";
+        return text.Length <= MaxMetaChars ? text : text[..MaxMetaChars];
+    }
 
     static double Number(MediaMetadata? metadata, string key) =>
         metadata?.GetLong(key) ?? 0;
@@ -160,9 +172,12 @@ public sealed class AndroidSessionService : IDisposable
                          ?? metadata.GetBitmap(MediaMetadata.MetadataKeyArt);
             if (bitmap is not null)
             {
+                if (bitmap.Width <= 0 || bitmap.Height <= 0 ||
+                    bitmap.Width > MaxArtworkSide || bitmap.Height > MaxArtworkSide ||
+                    (long)bitmap.Width * bitmap.Height > MaxArtworkPixels) return null;
                 using var stream = new MemoryStream();
                 if (!bitmap.Compress(Bitmap.CompressFormat.Png, 100, stream)) return null;
-                return stream.ToArray();
+                return stream.Length <= MaxArtworkBytes ? stream.ToArray() : null;
             }
 
             var uri = metadata.GetString(MediaMetadata.MetadataKeyAlbumArtUri)
@@ -171,7 +186,13 @@ public sealed class AndroidSessionService : IDisposable
             using var input = _context.ContentResolver!.OpenInputStream(global::Android.Net.Uri.Parse(uri));
             if (input is null) return null;
             using var copy = new MemoryStream();
-            await input.CopyToAsync(copy);
+            var buffer = new byte[81920];
+            int read;
+            while ((read = await input.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            {
+                if (copy.Length + read > MaxArtworkBytes) return null;
+                copy.Write(buffer, 0, read);
+            }
             return copy.ToArray();
         }
         catch (Exception ex)

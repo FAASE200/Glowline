@@ -19,7 +19,7 @@ public sealed class TimelineSmoother
     public double Update(
         double rawSeconds, bool playing, DateTimeOffset lastUpdated, DateTimeOffset now, string signature)
     {
-        rawSeconds = Math.Max(0, rawSeconds);
+        rawSeconds = double.IsFinite(rawSeconds) ? Math.Max(0, rawSeconds) : 0;
         var trackChanged = !string.Equals(signature, _signature, StringComparison.Ordinal);
         var playbackChanged = playing != _lastPlaying;
         var rawChanged = !double.IsNaN(_lastRaw) && Math.Abs(rawSeconds - _lastRaw) >= RawChangeEpsilon;
@@ -43,12 +43,12 @@ public sealed class TimelineSmoother
         else
             position = rawSeconds;
 
-        return Math.Max(0, position);
+        return double.IsFinite(position) ? Math.Max(0, position) : 0;
     }
 
     public void NotifySeek(double targetSeconds, DateTimeOffset now)
     {
-        targetSeconds = Math.Max(0, targetSeconds);
+        targetSeconds = double.IsFinite(targetSeconds) ? Math.Max(0, targetSeconds) : 0;
         _initialized = true;
         _anchorRaw = targetSeconds;
         _anchorAt = now;

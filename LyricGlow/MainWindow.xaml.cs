@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -71,7 +73,8 @@ public partial class MainWindow : Window
             var duration = Track.Duration is > 0
                 ? TimeSpan.FromSeconds(Track.Duration.Value).ToString(@"m\:ss")
                 : "--:--";
-            return $"{Track.TrackName} — {Track.ArtistName} · {duration} · {mode}";
+            var provider = string.IsNullOrEmpty(Track.Provider) ? "LRCLIB" : Track.Provider;
+            return $"{Track.TrackName} — {Track.ArtistName} · {duration} · {mode} · {provider}";
         }
     }
 
@@ -526,6 +529,24 @@ public partial class MainWindow : Window
         PageScroll.ScrollToEnd();
     }
 
+    public void DebugShowUpdateNotes(string version, string notes)
+    {
+        UpdateNotesTitle.Text = Loc.F("UpdateNotesTitleFormat", version);
+        UpdateNotesText.Text = FormatReleaseNotes(notes);
+        UpdateNotesBorder.Visibility = Visibility.Visible;
+        UpdateStatusText.Text = Loc.F("UpdateReadyFormat", version);
+        UpdateInstallButton.Content = Loc.F("RestartInstallFormat", version);
+        UpdateInstallButton.Visibility = Visibility.Visible;
+        UpdateNotesBorder.BringIntoView();
+    }
+
+    public void DebugHideUpdateNotes()
+    {
+        UpdateNotesBorder.Visibility = Visibility.Collapsed;
+        UpdateInstallButton.Visibility = Visibility.Collapsed;
+        UpdateStatusText.Text = Loc.T("UpdateNotChecked");
+    }
+
     public void DebugScrollToDesigner() => DesignerCard.BringIntoView();
 
     void JumpToSection_Click(object sender, RoutedEventArgs e)
@@ -577,6 +598,7 @@ public partial class MainWindow : Window
         SoundSenseCheck.IsChecked = s.SoundSenseEnabled;
         SoundSenseIntensitySlider.Value = Math.Clamp(s.SoundSenseIntensity * 100, 0, 100);
         SoundSenseIntensityText.Text = $"{(int)SoundSenseIntensitySlider.Value}%";
+        RefreshExtrasUi();
         AnimatedCoverCheck.IsChecked = s.AnimatedCoversEnabled;
         SetAnimStatus(s.AnimatedCoversEnabled ? "NoPlayback" : "CoverDisabled");
         SetCoverStatus("CoverStaticDash");
@@ -858,8 +880,8 @@ public partial class MainWindow : Window
             _ => Color.FromRgb(0x9C, 0xA3, 0xAF),
         });
         var isPlaying = snap?.IsPlaying == true;
-        PlayGlyph.Visibility = isPlaying ? Visibility.Collapsed : Visibility.Visible;
-        PauseGlyph.Visibility = isPlaying ? Visibility.Visible : Visibility.Collapsed;
+        PlayPauseIcon.Animate = !App.Designs.Active.ReduceMotion;
+        PlayPauseIcon.Playing = isPlaying;
     }
 
     async Task LoadArtAsync(TrackInfo track)
@@ -1232,6 +1254,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        RefreshExtrasUi();
         _trayOpenItem.Text = Loc.T("TrayOpen");
         _traySettingsItem.Text = Loc.T("TraySettings");
         _trayModeItem.Text = Loc.T("TrayToggleMode");
@@ -1490,6 +1513,18 @@ public partial class MainWindow : Window
         _ = App.Updates.CheckAsync(manual: true);
     }
 
+    void UpdateStar_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(ReleaseClient.RepoUrl) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Log.Write("update star: " + ex.Message);
+        }
+    }
+
     void UpdateInstall_Click(object sender, RoutedEventArgs e) => ExitApp(restartUpdate: true);
 
     void OnUpdateChanged(object? sender, EventArgs e)
@@ -1508,6 +1543,19 @@ public partial class MainWindow : Window
             _tray.ShowBalloonTip(3500, "Glowline",
                 Loc.F("UpdateReadyBalloon", state.Info?.Version.ToString(3) ?? ""),
                 WinForms.ToolTipIcon.None);
+        }
+    }
+
+    /// <summary>Shows a Windows notification from the tray icon.</summary>
+    public void ShowNotice(string text)
+    {
+        try
+        {
+            _tray.ShowBalloonTip(3500, "Glowline", text, WinForms.ToolTipIcon.None);
+        }
+        catch (Exception ex)
+        {
+            Log.Write("notice: " + ex.Message);
         }
     }
 
@@ -1536,6 +1584,46 @@ public partial class MainWindow : Window
         UpdateInstallButton.Visibility = ready ? Visibility.Visible : Visibility.Collapsed;
         if (ready && state.Info is { } info)
             UpdateInstallButton.Content = Loc.F("RestartInstallFormat", info.Version.ToString(3));
+
+        if (state.Info is { } notesInfo && notesInfo.Version > UpdateService.CurrentVersion)
+        {
+            var notesTitle = Loc.F("UpdateNotesTitleFormat", notesInfo.Version.ToString(3));
+            var notesText = notesInfo.Notes.Length > 0
+                ? FormatReleaseNotes(notesInfo.Notes)
+                : Loc.T("UpdateNotesUnavailable");
+            if (UpdateNotesTitle.Text != notesTitle) UpdateNotesTitle.Text = notesTitle;
+            if (UpdateNotesText.Text != notesText) UpdateNotesText.Text = notesText;
+            if (UpdateNotesBorder.Visibility != Visibility.Visible)
+                UpdateNotesBorder.Visibility = Visibility.Visible;
+        }
+        else if (UpdateNotesBorder.Visibility != Visibility.Collapsed)
+        {
+            UpdateNotesBorder.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    static string FormatReleaseNotes(string notes)
+    {
+        var builder = new StringBuilder(notes.Length + 32);
+        foreach (var rawLine in notes.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+        {
+            var line = rawLine.TrimEnd();
+            var text = line.TrimStart();
+            if (text.Length == 0)
+            {
+                builder.AppendLine();
+                continue;
+            }
+
+            while (text.StartsWith('#')) text = text[1..].TrimStart();
+            if (text.StartsWith("- ", StringComparison.Ordinal) ||
+                text.StartsWith("* ", StringComparison.Ordinal) ||
+                text.StartsWith("+ ", StringComparison.Ordinal))
+                text = "• " + text[2..];
+            text = text.Replace("**", "").Replace("__", "").Replace("`", "");
+            builder.AppendLine(text);
+        }
+        return builder.ToString().Trim();
     }
 
     public void ExitApp(bool restartUpdate = false)

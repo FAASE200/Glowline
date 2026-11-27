@@ -32,6 +32,12 @@ public sealed class LyricsService
         public LrclibTrack? Track { get; set; }
     }
 
+    const long MaxCacheBytes = 4L * 1024 * 1024;
+    static readonly JsonSerializerOptions CacheJsonOptions = new()
+    {
+        MaxDepth = ExternalHttp.MaxJsonDepth,
+    };
+
     static readonly Regex FeatSuffix = new(
         @"\s*[\(\[](?:feat|ft|with)\.?\s[^\)\]]*[\)\]]",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -50,6 +56,15 @@ public sealed class LyricsService
     readonly LyricsPlusClient _lyricsPlus = new();
 
     CancellationTokenSource? _cts;
+
+    // Null-safe: a hand-edited setting saved as "null" must not crash the app
+    // (Android loads settings without the Windows normalization).
+    Dictionary<string, Dictionary<string, int>> LineOffsets =>
+        _settings.Settings.PerLineOffsetMs ??= new Dictionary<string, Dictionary<string, int>>();
+
+    Dictionary<string, string> ManualPins =>
+        _settings.Settings.ManualPins ??= new Dictionary<string, string>();
+    IReadOnlyList<LrcLine> _sourceLines = Array.Empty<LrcLine>();
     long _resolveGeneration;
     SessionSnapshot? _snapshot;
     string _currentKey = "";
@@ -143,123 +158,24 @@ public sealed class LyricsService
                 return;
             }
 
-            if (source == LyricSource.Lrcmux)
+            if (ManualPins.ContainsKey(key))
             {
-                var cacheKey = AlbumCacheKey(LyricSource.Lrcmux, key, track.Album);
-                found = ignoreCache ? null : LoadCache(cacheKey);
-                if (!ignoreCache && found is null) found = LoadCache(CacheKey(LyricSource.Lrcmux, key));
-                if (!HasUsableSync(found))
+                var pinned = LoadPinned(key);
+                if (pinned is not null)
                 {
-                    var fresh = await FindLrcmuxAsync(track, cts.Token);
-                    if (fresh is not null) found = fresh;
+                    if (!IsCurrentResolution(generation, cts)) return;
+                    Apply(track, pinned, null);
+                    return;
                 }
-
-                Log.Write(found is null
-                    ? $"resolve[Lrcmux] '{track.DisplayName}' dur={track.DurationSeconds?.ToString("F0") ?? "-"} -> sin resultados"
-                    : $"resolve[Lrcmux] '{track.DisplayName}' dur={track.DurationSeconds?.ToString("F0") ?? "-"} -> '{found.TrackName}' / '{found.ArtistName}' ({found.Duration?.ToString("F0") ?? "?"}s, word={found.HasWordSync}, via={found.Source})");
-
-                if (HasUsableSync(found))
-                {
-                    SaveCache(cacheKey, found!);
-                }
-                else if (found?.Instrumental != true)
-                {
-                    Log.Write($"resolve[Lrcmux] '{track.DisplayName}' -> respaldo LyricsPlus");
-                    var backupKey = AlbumCacheKey(LyricSource.LyricsPlus, key, track.Album);
-                    var backup = ignoreCache ? null : LoadCache(backupKey);
-                    if (!HasUsableSync(backup))
-                    {
-                        var freshBackup = await FindLyricsPlusAsync(track, cts.Token);
-                        if (freshBackup is not null) backup = freshBackup;
-                    }
-
-                    if (HasUsableSync(backup))
-                    {
-                        found = backup;
-                        note = "LyricsNoteBackupLyricsPlus";
-                        SaveCache(backupKey, found!);
-                    }
-                    else if (backup?.Instrumental == true)
-                    {
-                        found = backup;
-                        note = "LyricsNoteBackupLyricsPlus";
-                    }
-                    else
-                    {
-                        var lrclib = await ResolveLrclibAsync(track, ignoreCache, cts.Token);
-                        if (lrclib is not null)
-                        {
-                            found = lrclib;
-                            note = "LyricsNoteBackupLrclib";
-                        }
-                        else
-                        {
-                            note = "LyricsNoteLrclibMissing";
-                        }
-                    }
-                }
-
-                cts.Token.ThrowIfCancellationRequested();
-                if (!IsCurrentResolution(generation, cts)) return;
-                Apply(track, found, note);
-                return;
+                // The pinned lyrics file is gone: fall back to the normal lookup.
+                ManualPins.Remove(key);
+                _settings.ScheduleSave();
             }
 
-            if (source == LyricSource.LyricsPlus)
+            if (source is LyricSource.Lrcmux or LyricSource.LyricsPlus)
             {
-                var cacheKey = AlbumCacheKey(LyricSource.LyricsPlus, key, track.Album);
-                found = ignoreCache ? null : LoadCache(cacheKey);
-                if (!HasUsableSync(found))
-                {
-                    var fresh = await FindLyricsPlusAsync(track, cts.Token);
-                    if (fresh is not null) found = fresh;
-                }
-
-                Log.Write(found is null
-                    ? $"resolve[LyricsPlus] '{track.DisplayName}' dur={track.DurationSeconds?.ToString("F0") ?? "-"} -> sin resultados"
-                    : $"resolve[LyricsPlus] '{track.DisplayName}' dur={track.DurationSeconds?.ToString("F0") ?? "-"} -> '{found.TrackName}' / '{found.ArtistName}' ({found.Duration?.ToString("F0") ?? "?"}s, word={found.HasWordSync}, via={found.Source})");
-
-                if (HasUsableSync(found))
-                {
-                    SaveCache(cacheKey, found!);
-                }
-                else if (found?.Instrumental != true)
-                {
-                    Log.Write($"resolve[LyricsPlus] '{track.DisplayName}' -> respaldo Lrcmux");
-                    var backupKey = AlbumCacheKey(LyricSource.Lrcmux, key, track.Album);
-                    var backup = ignoreCache ? null : LoadCache(backupKey);
-                    if (!HasUsableSync(backup))
-                    {
-                        var freshBackup = await FindLrcmuxAsync(track, cts.Token);
-                        if (freshBackup is not null) backup = freshBackup;
-                    }
-
-                    if (HasUsableSync(backup))
-                    {
-                        found = backup;
-                        note = "LyricsNoteBackupLrcmux";
-                        SaveCache(backupKey, found!);
-                    }
-                    else if (backup?.Instrumental == true)
-                    {
-                        found = backup;
-                        note = "LyricsNoteBackupLrcmux";
-                    }
-                    else
-                    {
-                        var lrclib = await ResolveLrclibAsync(track, ignoreCache, cts.Token);
-                        if (lrclib is not null)
-                        {
-                            found = lrclib;
-                            note = "LyricsNoteBackupLrclib";
-                        }
-                        else
-                        {
-                            note = "LyricsNoteLrclibMissing";
-                        }
-                    }
-                }
-
+                var backupSource = source == LyricSource.Lrcmux ? LyricSource.LyricsPlus : LyricSource.Lrcmux;
+                (found, note) = await ResolveWithFallbackAsync(track, source, backupSource, ignoreCache, cts.Token);
                 cts.Token.ThrowIfCancellationRequested();
                 if (!IsCurrentResolution(generation, cts)) return;
                 Apply(track, found, note);
@@ -284,6 +200,73 @@ public sealed class LyricsService
 
     bool IsCurrentResolution(long generation, CancellationTokenSource cts) =>
         generation == _resolveGeneration && !cts.IsCancellationRequested;
+
+    /// <summary>
+    /// Looks in the preferred source, then in the other word-synced source and
+    /// finally in LRCLIB. Returns the lyrics and the note the UI shows when a
+    /// fallback was used.
+    /// </summary>
+    async Task<(LrclibTrack? Found, string? Note)> ResolveWithFallbackAsync(
+        TrackInfo track, LyricSource primary, LyricSource backup, bool ignoreCache, CancellationToken ct)
+    {
+        var key = track.Key;
+        var primaryName = SourceName(primary);
+        var duration = track.DurationSeconds?.ToString("F0") ?? "-";
+
+        var cacheKey = AlbumCacheKey(primary, key, track.Album);
+        var found = ignoreCache ? null : LoadCache(cacheKey);
+        // Lrcmux lyrics cached before the album was part of the key are still valid.
+        if (!ignoreCache && found is null && primary == LyricSource.Lrcmux)
+            found = LoadCache(CacheKey(primary, key));
+        if (!HasUsableSync(found))
+        {
+            var fresh = await FindAsync(primary, track, ct);
+            if (fresh is not null) found = fresh;
+        }
+
+        Log.Write(found is null
+            ? $"resolve[{primaryName}] '{track.DisplayName}' dur={duration} -> no results"
+            : $"resolve[{primaryName}] '{track.DisplayName}' dur={duration} -> '{found.TrackName}' / '{found.ArtistName}' ({found.Duration?.ToString("F0") ?? "?"}s, word={found.HasWordSync}, via={found.Source})");
+
+        if (HasUsableSync(found))
+        {
+            SaveCache(cacheKey, found!);
+            return (found, null);
+        }
+
+        if (found?.Instrumental == true) return (found, null);
+
+        var backupNote = "LyricsNoteBackup" + SourceName(backup);
+        Log.Write($"resolve[{primaryName}] '{track.DisplayName}' -> fallback {SourceName(backup)}");
+        var backupKey = AlbumCacheKey(backup, key, track.Album);
+        var fallback = ignoreCache ? null : LoadCache(backupKey);
+        if (!HasUsableSync(fallback))
+        {
+            var freshBackup = await FindAsync(backup, track, ct);
+            if (freshBackup is not null) fallback = freshBackup;
+        }
+
+        if (HasUsableSync(fallback))
+        {
+            SaveCache(backupKey, fallback!);
+            return (fallback, backupNote);
+        }
+
+        if (fallback?.Instrumental == true) return (fallback, backupNote);
+
+        var lrclib = await ResolveLrclibAsync(track, ignoreCache, ct);
+        return lrclib is not null
+            ? (lrclib, "LyricsNoteBackupLrclib")
+            : (found, "LyricsNoteLrclibMissing");
+    }
+
+    Task<LrclibTrack?> FindAsync(LyricSource source, TrackInfo track, CancellationToken ct) => source switch
+    {
+        LyricSource.Lrcmux => FindLrcmuxAsync(track, ct),
+        LyricSource.LyricsPlus => FindLyricsPlusAsync(track, ct),
+        _ => ResolveLrclibAsync(track, ignoreCache: false, ct),
+    };
+
 
     async Task<LrclibTrack?> FindLyricsPlusAsync(TrackInfo track, CancellationToken ct)
     {
@@ -380,7 +363,8 @@ public sealed class LyricsService
             var lines = ParseBestLines(found);
             if (lines.Count > 1)
             {
-                SetState(LyricsState.Synced, lines, null, found, note);
+                _sourceLines = lines;
+                SetState(LyricsState.Synced, BuildDisplayLines(track), null, found, note);
                 return;
             }
         }
@@ -397,6 +381,7 @@ public sealed class LyricsService
     void SetState(LyricsState state, IReadOnlyList<LrcLine> lines, string? plain,
         LrclibTrack? found, string? noteKey = null, bool noUsableLines = false)
     {
+        if (state != LyricsState.Synced) _sourceLines = Array.Empty<LrcLine>();
         State = state;
         Lines = lines;
         PlainLyrics = plain;
@@ -446,7 +431,7 @@ public sealed class LyricsService
         return LyricText.Process(lines);
     }
 
-    static LrclibTrack? PickBest(List<LrclibTrack> results, TrackInfo track)
+    internal static LrclibTrack? PickBest(List<LrclibTrack> results, TrackInfo track)
     {
         if (results.Count == 0) return null;
 
@@ -514,6 +499,7 @@ public sealed class LyricsService
         var now = DateTimeOffset.Now;
         var playing = snap.IsPlaying;
         var target = snap.PositionSeconds + (playing ? Math.Max(0, (now - snap.CapturedAt).TotalSeconds) : 0);
+        if (!double.IsFinite(target)) target = 0;
 
         if (_seekTarget >= 0)
         {
@@ -593,14 +579,131 @@ public sealed class LyricsService
         Track is not null && _settings.Settings.PerTrackOffsetMs.TryGetValue(Track.Key, out var v) ? v : 0;
 
     public bool HasManualOverride =>
-        Track is not null && _settings.Settings.ManualOverrides.ContainsKey(Track.Key);
+        Track is not null && (_settings.Settings.ManualOverrides.ContainsKey(Track.Key) ||
+                              ManualPins.ContainsKey(Track.Key));
 
     public void ClearManualOverride()
     {
         if (Track is null) return;
         _settings.Settings.ManualOverrides.Remove(Track.Key);
+        if (ManualPins.Remove(Track.Key)) DeletePinned(Track.Key);
         _settings.ScheduleSave();
         _ = ResolveAsync(Track, ignoreCache: true);
+    }
+
+    // ------------------------------------------------------------------
+    // Per-line timing and romanization
+    // ------------------------------------------------------------------
+
+    /// <summary>Limit for a single line adjustment (±5 s).</summary>
+    public const int MaxLineOffsetMs = 5000;
+
+    static string LineId(LrcLine line)
+    {
+        var time = double.IsNaN(line.SourceTime) ? line.Time : line.SourceTime;
+        return ((long)Math.Round(time * 1000)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    public int GetLineOffsetMs(int index)
+    {
+        var lines = Lines;
+        if (Track is null || index < 0 || index >= lines.Count) return 0;
+        return LineOffsets.TryGetValue(Track.Key, out var map) && map is not null &&
+               map.TryGetValue(LineId(lines[index]), out var value)
+            ? value
+            : 0;
+    }
+
+    public void AdjustLineOffset(int index, int deltaMs)
+    {
+        var lines = Lines;
+        if (Track is null || State != LyricsState.Synced || index < 0 || index >= lines.Count) return;
+        var all = LineOffsets;
+        if (!all.TryGetValue(Track.Key, out var map) || map is null)
+        {
+            map = new Dictionary<string, int>();
+            all[Track.Key] = map;
+        }
+        var id = LineId(lines[index]);
+        var value = Math.Clamp((map.TryGetValue(id, out var current) ? current : 0) + deltaMs,
+            -MaxLineOffsetMs, MaxLineOffsetMs);
+        if (value == 0) map.Remove(id);
+        else map[id] = value;
+        if (map.Count == 0) all.Remove(Track.Key);
+        _settings.ScheduleSave();
+        RefreshDisplayLines();
+    }
+
+    public void ResetLineOffset(int index)
+    {
+        var lines = Lines;
+        if (Track is null || index < 0 || index >= lines.Count) return;
+        if (!LineOffsets.TryGetValue(Track.Key, out var map) || map is null) return;
+        if (!map.Remove(LineId(lines[index]))) return;
+        if (map.Count == 0) LineOffsets.Remove(Track.Key);
+        _settings.ScheduleSave();
+        RefreshDisplayLines();
+    }
+
+    /// <summary>
+    /// Rebuilds the visible lines (per-line timing, romanization) without
+    /// downloading the lyrics again.
+    /// </summary>
+    public void RefreshDisplayLines()
+    {
+        if (State != LyricsState.Synced || Track is null || _sourceLines.Count == 0) return;
+        Lines = BuildDisplayLines(Track);
+        Changed?.Invoke();
+    }
+
+    IReadOnlyList<LrcLine> BuildDisplayLines(TrackInfo track)
+    {
+        var source = _sourceLines;
+        LineOffsets.TryGetValue(track.Key, out var offsets);
+        return BuildDisplayLines(source, offsets, _settings.Settings.RomanizationEnabled);
+    }
+
+    internal static IReadOnlyList<LrcLine> BuildDisplayLines(
+        IReadOnlyList<LrcLine> source, IReadOnlyDictionary<string, int>? offsets, bool romanize)
+    {
+        var result = new List<LrcLine>(source.Count);
+        for (var i = 0; i < source.Count; i++)
+        {
+            var line = source[i];
+            var shiftMs = offsets is not null && offsets.TryGetValue(LineId(line), out var value) ? value : 0;
+            var baseTime = double.IsNaN(line.SourceTime) ? line.Time : line.SourceTime;
+            var time = baseTime + shiftMs / 1000.0;
+            // An adjusted line can't move before the previous one or past the
+            // next one: the binary-search index relies on the order.
+            var lower = i > 0 ? result[i - 1].Time + 0.01 : 0;
+            var next = i + 1 < source.Count ? source[i + 1] : null;
+            var upper = next is null
+                ? double.MaxValue
+                : (double.IsNaN(next.SourceTime) ? next.Time : next.SourceTime) - 0.01;
+            time = Math.Clamp(time, lower, Math.Max(lower, upper));
+            var delta = time - line.Time;
+
+            result.Add(new LrcLine
+            {
+                Time = time,
+                Text = line.Text,
+                Background = line.Background,
+                Words = Shift(line.Words, delta),
+                BackgroundWords = Shift(line.BackgroundWords, delta),
+                Romanized = romanize ? Romanizer.Romanize(line.Text) : "",
+                SourceTime = baseTime,
+            });
+        }
+        return result;
+    }
+
+    static IReadOnlyList<LrcWord>? Shift(IReadOnlyList<LrcWord>? words, double delta)
+    {
+        if (words is null || Math.Abs(delta) < 0.0005) return words;
+        var shifted = new List<LrcWord>(words.Count);
+        foreach (var word in words)
+            shifted.Add(new LrcWord { Time = Math.Max(0, word.Time + delta), Text = word.Text });
+        return shifted;
     }
 
     public void AdjustGlobalOffset(int deltaMs)
@@ -655,8 +758,71 @@ public sealed class LyricsService
         return ans;
     }
 
-    public Task<List<LrclibTrack>> SearchManualAsync(string query, CancellationToken ct) =>
-        _client.SearchByQueryAsync(query, ct);
+    /// <summary>
+    /// Manual search across the three sources. LRCLIB takes free text;
+    /// Lrcmux and LyricsPlus need a title and artist, taken from the query
+    /// ("Artist - Title") or from the artist of the current track.
+    /// </summary>
+    public async Task<List<LrclibTrack>> SearchManualAsync(string query, CancellationToken ct)
+    {
+        var (title, artist) = SplitManualQuery(query, Track?.Artist);
+        var lrclibTask = _client.SearchByQueryAsync(query, ct);
+        var lrcmuxTask = title.Length > 0
+            ? SafeAsync(() => _lrcmux.GetAsync(title, artist, null, null, ct))
+            : Task.FromResult<LrclibTrack?>(null);
+        var lyricsPlusTask = title.Length > 0
+            ? SafeAsync(() => _lyricsPlus.GetAsync(title, artist, null, null, ct))
+            : Task.FromResult<LrclibTrack?>(null);
+
+        await Task.WhenAll(lrclibTask, lrcmuxTask, lyricsPlusTask).ConfigureAwait(true);
+        ct.ThrowIfCancellationRequested();
+
+        var results = new List<LrclibTrack>();
+        foreach (var (task, provider) in new[] { (lrcmuxTask, "Lrcmux"), (lyricsPlusTask, "LyricsPlus") })
+        {
+            var found = task.Result;
+            if (found is null || (!found.HasSynced && !found.HasPlain)) continue;
+            found.Provider = provider;
+            results.Add(found);
+        }
+        foreach (var found in lrclibTask.Result)
+        {
+            found.Provider = "LRCLIB";
+            results.Add(found);
+        }
+        return results;
+    }
+
+    internal static (string Title, string Artist) SplitManualQuery(string query, string? currentArtist)
+    {
+        var text = (query ?? "").Trim();
+        foreach (var separator in new[] { " - ", " – ", " — " })
+        {
+            var index = text.IndexOf(separator, StringComparison.Ordinal);
+            if (index <= 0) continue;
+            var artist = text[..index].Trim();
+            var title = text[(index + separator.Length)..].Trim();
+            if (title.Length > 0 && artist.Length > 0) return (title, artist);
+        }
+        return (text, currentArtist?.Trim() ?? "");
+    }
+
+    static async Task<LrclibTrack?> SafeAsync(Func<Task<LrclibTrack?>> action)
+    {
+        try
+        {
+            return await action().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Log.Write("manual search: " + ex.Message);
+            return null;
+        }
+    }
 
     public void ApplyManual(LrclibTrack result)
     {
@@ -664,10 +830,66 @@ public sealed class LyricsService
         // Invalida la resolución en curso para que no pise la elección manual.
         _resolveGeneration++;
         _cts?.Cancel();
-        _settings.Settings.ManualOverrides[Track.Key] = result.Id;
+        var key = Track.Key;
+        if (result.Provider is "Lrcmux" or "LyricsPlus")
+        {
+            // Lrcmux and LyricsPlus lyrics have no stable id, so a pinned copy
+            // is stored that does not expire with the cache.
+            _settings.Settings.ManualOverrides.Remove(key);
+            ManualPins[key] = result.Provider;
+            SavePinned(key, result);
+        }
+        else
+        {
+            if (ManualPins.Remove(key)) DeletePinned(key);
+            _settings.Settings.ManualOverrides[key] = result.Id;
+            SaveCache(AlbumCacheKey(LyricSource.Lrclib, key, Track.Album), result);
+        }
         _settings.ScheduleSave();
-        SaveCache(AlbumCacheKey(LyricSource.Lrclib, Track.Key, Track.Album), result);
         Apply(Track, result);
+    }
+
+    static string PinnedPath(string trackKey) =>
+        Path.Combine(StoragePaths.CacheDirectory, "pinned", Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes("pin|" + trackKey)))[..24] + ".json");
+
+    void SavePinned(string trackKey, LrclibTrack track)
+    {
+        try
+        {
+            var path = PinnedPath(trackKey);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var json = JsonSerializer.Serialize(new CacheEntry { Version = 2, FetchedAtUtc = DateTime.UtcNow, Track = track });
+            if (json.Length > MaxCacheBytes) return;
+            File.WriteAllText(path + ".tmp", json);
+            File.Move(path + ".tmp", path, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            Log.Write("pinned save: " + ex.Message);
+        }
+    }
+
+    LrclibTrack? LoadPinned(string trackKey)
+    {
+        try
+        {
+            var path = PinnedPath(trackKey);
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length <= 0 || info.Length > MaxCacheBytes) return null;
+            var entry = JsonSerializer.Deserialize<CacheEntry>(File.ReadAllBytes(path), CacheJsonOptions);
+            if (entry?.Track is null || !LrcLibClient.ValidateTrack(entry.Track)) return null;
+            return entry.Track;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    static void DeletePinned(string trackKey)
+    {
+        try { File.Delete(PinnedPath(trackKey)); } catch { }
     }
 
     string CachePath(string key) =>
@@ -679,7 +901,16 @@ public sealed class LyricsService
         try
         {
             var entry = new CacheEntry { Version = 2, FetchedAtUtc = DateTime.UtcNow, Track = track };
-            File.WriteAllText(CachePath(key), JsonSerializer.Serialize(entry));
+            var json = JsonSerializer.Serialize(entry);
+            if (json.Length > MaxCacheBytes) return;
+            var path = CachePath(key);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            // Atomic write: if the app closes halfway, no truncated JSON is left
+            // behind that would force the lyrics to be downloaded again.
+            var temp = path + ".tmp";
+            File.WriteAllText(temp, json);
+            File.Move(temp, path, overwrite: true);
+            PruneCacheOccasionally();
         }
         catch (Exception ex)
         {
@@ -687,15 +918,72 @@ public sealed class LyricsService
         }
     }
 
+    internal const int MaxCachedLyrics = 2000;
+    static readonly TimeSpan CacheLifetime = TimeSpan.FromDays(14);
+    static int _savesSincePrune = int.MaxValue / 2;
+
+    // The lyrics cache used to grow forever. Every so many writes, expired
+    // entries are removed and, if there are too many, the oldest ones.
+    static void PruneCacheOccasionally()
+    {
+        if (Interlocked.Increment(ref _savesSincePrune) < 50) return;
+        Interlocked.Exchange(ref _savesSincePrune, 0);
+        _ = Task.Run(() => PruneCache(StoragePaths.CacheDirectory, MaxCachedLyrics, CacheLifetime, DateTime.UtcNow));
+    }
+
+    internal static int PruneCache(string directory, int maxFiles, TimeSpan lifetime, DateTime nowUtc)
+    {
+        var removed = 0;
+        try
+        {
+            var dir = new DirectoryInfo(directory);
+            if (!dir.Exists) return 0;
+            var files = dir.GetFiles("*.json", SearchOption.TopDirectoryOnly)
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .ToList();
+            for (var i = 0; i < files.Count; i++)
+            {
+                var file = files[i];
+                if (i < maxFiles && nowUtc - file.LastWriteTimeUtc <= lifetime) continue;
+                try
+                {
+                    file.Delete();
+                    removed++;
+                }
+                catch
+                {
+                }
+            }
+
+            foreach (var temp in dir.GetFiles("*.json.tmp", SearchOption.TopDirectoryOnly))
+            {
+                if (nowUtc - temp.LastWriteTimeUtc < TimeSpan.FromHours(1)) continue;
+                try { temp.Delete(); } catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Write("cache prune: " + ex.Message);
+        }
+
+        if (removed > 0) Log.Write($"cache prune: removed {removed} old lyrics");
+        return removed;
+    }
+
+
     LrclibTrack? LoadCache(string key)
     {
         try
         {
             var path = CachePath(key);
             if (!File.Exists(path)) return null;
-            var entry = JsonSerializer.Deserialize<CacheEntry>(File.ReadAllText(path));
+            var info = new FileInfo(path);
+            if (info.Length <= 0 || info.Length > MaxCacheBytes) return null;
+            var entry = JsonSerializer.Deserialize<CacheEntry>(
+                File.ReadAllBytes(path), CacheJsonOptions);
             if (entry?.Track is null || entry.Version < 2) return null;
-            if (DateTime.UtcNow - entry.FetchedAtUtc > TimeSpan.FromDays(14)) return null;
+            if (DateTime.UtcNow - entry.FetchedAtUtc > CacheLifetime) return null;
+            if (!LrcLibClient.ValidateTrack(entry.Track)) return null;
             return entry.Track;
         }
         catch

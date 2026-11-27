@@ -39,8 +39,8 @@ public sealed class Loc : INotifyPropertyChanged
         new LanguageOption(AppLanguage.Russian, "ru", "Русский"),
     };
 
-    public static AppLanguage Current { get; private set; } = AppLanguage.Spanish;
-    public static CultureInfo Culture { get; private set; } = new("es-CL");
+    public static AppLanguage Current { get; private set; } = AppLanguage.English;
+    public static CultureInfo Culture { get; private set; } = new("en-US");
 
     public string this[string key] => Get(Current, key);
 

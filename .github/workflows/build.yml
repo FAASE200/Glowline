@@ -1,0 +1,50 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows (WPF + tests)
+    runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test LyricGlow.Core
+        run: dotnet run --project LyricGlow.Core.Tests/LyricGlow.Core.Tests.csproj -c Release
+
+      - name: Build the Windows app
+        run: dotnet build LyricGlow/LyricGlow.csproj -c Release
+
+      - name: Publish portable build
+        if: github.event_name == 'push'
+        run: >
+          dotnet publish LyricGlow/LyricGlow.csproj -c Release -r win-x64
+          --self-contained true -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+
+      - name: Upload artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Glowline-portable-win-x64
+          path: publish/LyricGlow.exe
+          retention-days: 14

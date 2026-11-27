@@ -36,6 +36,12 @@ public sealed class CoverArtService
 {
     const int MinImageBytes = 8_000;
     const long MaxImageBytes = 40L * 1024 * 1024;
+    const int MaxImageSide = 4096;
+    const long MaxImagePixels = 16L * 1024 * 1024;
+    const int MaxSearchResults = 50;
+    const int MaxMetaChars = 512;
+    const long MaxMetaBytes = 64 * 1024;
+    const double MaxDurationSeconds = 24 * 60 * 60;
     static readonly TimeSpan DiskTtl = TimeSpan.FromDays(45);
     static readonly TimeSpan NegativeTtl = TimeSpan.FromMinutes(2);
     static readonly TimeSpan LowResTtl = TimeSpan.FromSeconds(12);
@@ -43,6 +49,9 @@ public sealed class CoverArtService
     const long MemoryMaxBytes = 64L * 1024 * 1024;
     const int AlbumCacheMaxEntries = 32;
 
+    static readonly ExternalHostPolicy ItunesHosts = ExternalHostPolicy.Of("itunes.apple.com");
+    static readonly ExternalHostPolicy DeezerHosts = ExternalHostPolicy.Of("deezer.com");
+    static readonly ExternalHostPolicy ArtworkHosts = ExternalHostPolicy.Of("mzstatic.com", "dzcdn.net");
     static readonly HttpClient Http = CreateClient();
     static readonly Regex FeatSuffix = new(
         @"\s*[\(\[](?:feat|ft|with)\.?\s[^\)\]]*[\)\]]",
@@ -358,7 +367,8 @@ public sealed class CoverArtService
 
     static string PrimaryArtistKey(string? artist)
     {
-        var cleaned = ArtistFeat.Replace(artist ?? "", " ");
+        var capped = artist is { Length: > 512 } ? artist[..512] : artist ?? "";
+        var cleaned = ArtistFeat.Replace(capped, " ");
         var folded = FoldAccents(cleaned).ToLowerInvariant();
         var first = Regex.Split(folded, @"\s*(?:,|&|/|\+|\b(?:y|and|x|vs\.?)\b)\s*")
             .FirstOrDefault(part => part.Trim().Length > 0);
@@ -383,11 +393,12 @@ public sealed class CoverArtService
             .Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
         if (term.Length == 0) return new CoverArtResult();
 
-        var url = "https://itunes.apple.com/search?term=" + Uri.EscapeDataString(term) +
-                  "&entity=song&limit=10";
+        var url = "https://itunes.apple.com/search?term=" +
+                  Uri.EscapeDataString(ExternalHttp.ClampQueryValue(term)) + "&entity=song&limit=10";
         try
         {
-            using var resp = await Http.GetAsync(url, ct);
+            var uri = ItunesHosts.Require(url);
+            using var resp = await ExternalHttp.SendAsync(Http, uri, ItunesHosts, ct);
             if (resp.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.Forbidden)
             {
                 _itunesCooldownUntil = DateTime.UtcNow.AddMinutes(2);
@@ -400,24 +411,33 @@ public sealed class CoverArtService
                 return new CoverArtResult();
             }
 
-            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
-            if (!doc.RootElement.TryGetProperty("results", out var results)) return new CoverArtResult();
+            using var doc = await ExternalHttp.ReadJsonAsync(
+                resp, ExternalHttp.MaxSearchJsonBytes, ct, allowJavaScript: true);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object ||
+                !doc.RootElement.TryGetProperty("results", out var results) ||
+                results.ValueKind != JsonValueKind.Array)
+                return new CoverArtResult();
 
             string? artwork = null;
             var best = double.NegativeInfinity;
             var bestTitle = "";
             var bestArtist = "";
             var bestAlbum = "";
+            var count = 0;
             foreach (var item in results.EnumerateArray())
             {
+                if (++count > MaxSearchResults) break;
+                if (item.ValueKind != JsonValueKind.Object) continue;
+
                 var title = GetString(item, "trackName");
                 var artist = GetString(item, "artistName");
                 var album = GetString(item, "collectionName");
                 var candidate = GetString(item, "artworkUrl100");
-                if (candidate.Length == 0) continue;
+                if (candidate.Length == 0 || !IsArtworkUrl(candidate)) continue;
 
                 double? duration = null;
-                if (item.TryGetProperty("trackTimeMillis", out var ms) && ms.TryGetDouble(out var value))
+                if (item.TryGetProperty("trackTimeMillis", out var ms) &&
+                    ms.TryGetDouble(out var value) && ExternalHttp.IsFiniteInRange(value, 0, MaxDurationSeconds * 1000))
                     duration = value / 1000.0;
 
                 var score = Score(track, title, artist, album, duration, out var titleOk);
@@ -470,26 +490,35 @@ public sealed class CoverArtService
             .Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
         if (query.Length == 0) return new CoverArtResult();
 
-        var url = "https://api.deezer.com/search?q=" + Uri.EscapeDataString(query) + "&limit=10";
+        var url = "https://api.deezer.com/search?q=" +
+                  Uri.EscapeDataString(ExternalHttp.ClampQueryValue(query)) + "&limit=10";
         try
         {
-            using var resp = await Http.GetAsync(url, ct);
+            var uri = DeezerHosts.Require(url);
+            using var resp = await ExternalHttp.SendAsync(Http, uri, DeezerHosts, ct);
             if (!resp.IsSuccessStatusCode)
             {
                 Log.Write($"cover: Deezer HTTP {(int)resp.StatusCode}");
                 return new CoverArtResult();
             }
 
-            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
-            if (!doc.RootElement.TryGetProperty("data", out var data)) return new CoverArtResult();
+            using var doc = await ExternalHttp.ReadJsonAsync(resp, ExternalHttp.MaxSearchJsonBytes, ct);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object ||
+                !doc.RootElement.TryGetProperty("data", out var data) ||
+                data.ValueKind != JsonValueKind.Array)
+                return new CoverArtResult();
 
             string? artwork = null;
             var best = double.NegativeInfinity;
             var bestTitle = "";
             var bestArtist = "";
             var bestAlbum = "";
+            var count = 0;
             foreach (var item in data.EnumerateArray())
             {
+                if (++count > MaxSearchResults) break;
+                if (item.ValueKind != JsonValueKind.Object) continue;
+
                 var title = GetString(item, "title");
                 var artist = item.TryGetProperty("artist", out var artistNode)
                     ? GetString(artistNode, "name") : "";
@@ -499,10 +528,11 @@ public sealed class CoverArtService
 
                 var candidate = GetString(albumArt, "cover_xl");
                 if (candidate.Length == 0) candidate = GetString(albumArt, "cover_big");
-                if (candidate.Length == 0) continue;
+                if (candidate.Length == 0 || !IsArtworkUrl(candidate)) continue;
 
                 double? duration = null;
-                if (item.TryGetProperty("duration", out var d) && d.TryGetDouble(out var value))
+                if (item.TryGetProperty("duration", out var d) &&
+                    d.TryGetDouble(out var value) && ExternalHttp.IsFiniteInRange(value, 0, MaxDurationSeconds))
                     duration = value;
 
                 var score = Score(track, title, artist, album, duration, out var titleOk);
@@ -546,11 +576,12 @@ public sealed class CoverArtService
             .Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
         if (term.Length == 0) return new CoverArtResult();
 
-        var url = "https://itunes.apple.com/search?term=" + Uri.EscapeDataString(term) +
-                  "&entity=album&limit=5";
+        var url = "https://itunes.apple.com/search?term=" +
+                  Uri.EscapeDataString(ExternalHttp.ClampQueryValue(term)) + "&entity=album&limit=5";
         try
         {
-            using var resp = await Http.GetAsync(url, ct);
+            var uri = ItunesHosts.Require(url);
+            using var resp = await ExternalHttp.SendAsync(Http, uri, ItunesHosts, ct);
             if (resp.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.Forbidden)
             {
                 _itunesCooldownUntil = DateTime.UtcNow.AddMinutes(2);
@@ -558,19 +589,27 @@ public sealed class CoverArtService
             }
             if (!resp.IsSuccessStatusCode) return new CoverArtResult();
 
-            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
-            if (!doc.RootElement.TryGetProperty("results", out var results)) return new CoverArtResult();
+            using var doc = await ExternalHttp.ReadJsonAsync(
+                resp, ExternalHttp.MaxSearchJsonBytes, ct, allowJavaScript: true);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object ||
+                !doc.RootElement.TryGetProperty("results", out var results) ||
+                results.ValueKind != JsonValueKind.Array)
+                return new CoverArtResult();
 
             string? artwork = null;
             var best = double.NegativeInfinity;
             var bestAlbum = "";
             var bestArtist = "";
+            var count = 0;
             foreach (var item in results.EnumerateArray())
             {
+                if (++count > MaxSearchResults) break;
+                if (item.ValueKind != JsonValueKind.Object) continue;
+
                 var album = GetString(item, "collectionName");
                 var artist = GetString(item, "artistName");
                 var candidate = GetString(item, "artworkUrl100");
-                if (candidate.Length == 0) continue;
+                if (candidate.Length == 0 || !IsArtworkUrl(candidate)) continue;
 
                 var score = ScoreAlbum(track, album, artist);
                 if (score <= best) continue;
@@ -611,27 +650,36 @@ public sealed class CoverArtService
             .Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
         if (query.Length == 0) return new CoverArtResult();
 
-        var url = "https://api.deezer.com/search/album?q=" + Uri.EscapeDataString(query) + "&limit=5";
+        var url = "https://api.deezer.com/search/album?q=" +
+                  Uri.EscapeDataString(ExternalHttp.ClampQueryValue(query)) + "&limit=5";
         try
         {
-            using var resp = await Http.GetAsync(url, ct);
+            var uri = DeezerHosts.Require(url);
+            using var resp = await ExternalHttp.SendAsync(Http, uri, DeezerHosts, ct);
             if (!resp.IsSuccessStatusCode) return new CoverArtResult();
 
-            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
-            if (!doc.RootElement.TryGetProperty("data", out var data)) return new CoverArtResult();
+            using var doc = await ExternalHttp.ReadJsonAsync(resp, ExternalHttp.MaxSearchJsonBytes, ct);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object ||
+                !doc.RootElement.TryGetProperty("data", out var data) ||
+                data.ValueKind != JsonValueKind.Array)
+                return new CoverArtResult();
 
             string? artwork = null;
             var best = double.NegativeInfinity;
             var bestAlbum = "";
             var bestArtist = "";
+            var count = 0;
             foreach (var item in data.EnumerateArray())
             {
+                if (++count > MaxSearchResults) break;
+                if (item.ValueKind != JsonValueKind.Object) continue;
+
                 var album = GetString(item, "title");
                 var artist = item.TryGetProperty("artist", out var artistNode)
                     ? GetString(artistNode, "name") : "";
                 var candidate = GetString(item, "cover_xl");
                 if (candidate.Length == 0) candidate = GetString(item, "cover_big");
-                if (candidate.Length == 0) continue;
+                if (candidate.Length == 0 || !IsArtworkUrl(candidate)) continue;
 
                 var score = ScoreAlbum(track, album, artist);
                 if (score <= best) continue;
@@ -669,24 +717,22 @@ public sealed class CoverArtService
         return score;
     }
 
-    static async Task<byte[]?> DownloadImageAsync(string url, CancellationToken ct)    {
+    static async Task<byte[]?> DownloadImageAsync(string url, CancellationToken ct)
+    {
         try
         {
-            using var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
-            if (!resp.IsSuccessStatusCode) return null;
-            if (resp.Content.Headers.ContentLength is > MaxImageBytes) return null;
-
-            await using var stream = await resp.Content.ReadAsStreamAsync(ct);
-            using var buffer = new MemoryStream();
-            var chunk = new byte[81920];
-            int read;
-            while ((read = await stream.ReadAsync(chunk, ct)) > 0)
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || !ArtworkHosts.Allows(uri))
             {
-                buffer.Write(chunk, 0, read);
-                if (buffer.Length > MaxImageBytes) return null;
+                Log.Write("cover download: host de imagen no permitido");
+                return null;
             }
 
-            var bytes = buffer.ToArray();
+            using var resp = await ExternalHttp.SendAsync(Http, uri, ArtworkHosts, ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            ExternalHttp.EnsureContentType(resp, "image/jpeg", "image/png", "image/gif");
+            if (resp.Content.Headers.ContentLength is > MaxImageBytes) return null;
+
+            var bytes = await ExternalHttp.ReadBytesAsync(resp, MaxImageBytes, ct);
             return bytes.Length >= MinImageBytes && LooksLikeImage(bytes) ? bytes : null;
         }
         catch (OperationCanceledException)
@@ -748,8 +794,10 @@ public sealed class CoverArtService
 
     internal static bool ArtistMatch(string wantedRaw, string foundRaw)
     {
-        var wanted = NormalizeMatch(ArtistFeat.Replace(wantedRaw ?? "", " "));
-        var found = NormalizeMatch(ArtistFeat.Replace(foundRaw ?? "", " "));
+        var wantedCapped = wantedRaw is { Length: > 512 } ? wantedRaw[..512] : wantedRaw;
+        var foundCapped = foundRaw is { Length: > 512 } ? foundRaw[..512] : foundRaw;
+        var wanted = NormalizeMatch(ArtistFeat.Replace(wantedCapped ?? "", " "));
+        var found = NormalizeMatch(ArtistFeat.Replace(foundCapped ?? "", " "));
         if (wanted.Length == 0 || found.Length == 0) return false;
         if (wanted == found) return true;
 
@@ -807,7 +855,8 @@ public sealed class CoverArtService
 
     static string NormalizeMatch(string? value)
     {
-        var text = FeatSuffix.Replace(value ?? "", " ");
+        var capped = value is { Length: > 512 } ? value[..512] : value ?? "";
+        var text = FeatSuffix.Replace(capped, " ");
         text = EditionSuffix.Replace(text, " ");
         text = FoldAccents(text).ToLowerInvariant().Replace('&', ' ');
         text = Regex.Replace(text, @"[^\p{L}\p{N}]+", " ");
@@ -831,13 +880,26 @@ public sealed class CoverArtService
 
     static string GetString(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString() ?? "" : "";
+            ? ExternalHttp.CleanText(value.GetString(), MaxMetaChars) : "";
+
+    static bool IsArtworkUrl(string value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) && ArtworkHosts.Allows(uri);
+
+    internal static bool IsAcceptableImageSize(int width, int height) =>
+        width > 0 && height > 0 &&
+        width <= MaxImageSide && height <= MaxImageSide &&
+        (long)width * height <= MaxImagePixels;
 
     CoverArtResult MakeResult(
         byte[]? bytes, string source, string album = "", string artist = "", string title = "")
     {
         if (bytes is not { Length: > 0 }) return new CoverArtResult();
         var (width, height) = ImageSize(bytes);
+        if (!IsAcceptableImageSize(width, height))
+        {
+            Log.Write($"cover: imagen rechazada {width}x{height}");
+            return new CoverArtResult();
+        }
         return new CoverArtResult
         {
             Bytes = bytes,
@@ -886,7 +948,7 @@ public sealed class CoverArtService
             {
                 var path = CachePath(CacheKey(track), provider);
                 var info = new FileInfo(path);
-                if (!info.Exists || info.Length < MinImageBytes) continue;
+                if (!info.Exists || info.Length < MinImageBytes || info.Length > MaxImageBytes) continue;
                 if (DateTime.UtcNow - info.LastWriteTimeUtc > DiskTtl) continue;
                 var bytes = File.ReadAllBytes(path);
                 if (!LooksLikeImage(bytes)) continue;
@@ -899,10 +961,15 @@ public sealed class CoverArtService
                 {
                     try
                     {
-                        using var meta = JsonDocument.Parse(File.ReadAllText(metaPath));
-                        album = GetString(meta.RootElement, "album");
-                        artist = GetString(meta.RootElement, "artist");
-                        title = GetString(meta.RootElement, "title");
+                        var metaInfo = new FileInfo(metaPath);
+                        if (metaInfo.Length is > 0 and <= MaxMetaBytes)
+                        {
+                            using var meta = JsonDocument.Parse(File.ReadAllBytes(metaPath),
+                                ExternalHttp.JsonOptions);
+                            album = GetString(meta.RootElement, "album");
+                            artist = GetString(meta.RootElement, "artist");
+                            title = GetString(meta.RootElement, "title");
+                        }
                     }
                     catch
                     {
@@ -961,11 +1028,7 @@ public sealed class CoverArtService
         }
     }
 
-    static HttpClient CreateClient()
-    {
-        var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("LyricGlow/0.9.2 (personal Windows lyric overlay)");
-        http.DefaultRequestHeaders.Accept.ParseAdd("application/json,image/*");
-        return http;
-    }
+    static HttpClient CreateClient() =>
+        ExternalHttp.CreateClient(TimeSpan.FromSeconds(8),
+            AppInfo.UserAgent, "application/json", "image/*");
 }

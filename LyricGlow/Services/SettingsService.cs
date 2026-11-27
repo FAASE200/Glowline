@@ -19,6 +19,14 @@ public sealed class SettingsService : IAppSettingsStore
     const double MaxFontScale = 1.8;
     // Los desplazamientos fuera de este rango no tienen sentido como corrección manual.
     const int OffsetLimitMs = 5 * 60 * 1000;
+    const long MaxSettingsBytes = 2L * 1024 * 1024;
+    const int MaxDictionaryEntries = 2000;
+    const int MaxKeyChars = 512;
+    const int MaxTextChars = 256;
+    static readonly JsonSerializerOptions LoadOptions = new()
+    {
+        MaxDepth = 32,
+    };
 
     readonly string _path = Path.Combine(DataDir, "settings.json");
     DispatcherTimer? _saveTimer;
@@ -51,7 +59,14 @@ public sealed class SettingsService : IAppSettingsStore
     {
         try
         {
-            return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_path));
+            var info = new FileInfo(_path);
+            if (!info.Exists || info.Length <= 0) return null;
+            if (info.Length > MaxSettingsBytes)
+            {
+                Log.Write("settings: archivo excede el límite y se ignora");
+                return null;
+            }
+            return JsonSerializer.Deserialize<AppSettings>(File.ReadAllBytes(_path), LoadOptions);
         }
         catch (Exception ex)
         {
@@ -66,6 +81,8 @@ public sealed class SettingsService : IAppSettingsStore
     {
         try
         {
+            var info = new FileInfo(_path);
+            if (!info.Exists || info.Length <= 0 || info.Length > MaxSettingsBytes) return;
             var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
             var backup = $"{_path}.corrupt-{stamp}.bak";
             File.Copy(_path, backup, overwrite: false);
@@ -97,6 +114,7 @@ public sealed class SettingsService : IAppSettingsStore
         var temp = _path + ".tmp";
         try
         {
+            Normalize(Settings);
             Directory.CreateDirectory(DataDir);
             File.WriteAllText(temp,
                 JsonSerializer.Serialize(Settings, new JsonSerializerOptions
@@ -120,10 +138,18 @@ public sealed class SettingsService : IAppSettingsStore
             s.LyricsSource = LyricSource.Lrcmux;
         if (!Enum.IsDefined(typeof(InterfaceTheme), s.InterfaceTheme))
             s.InterfaceTheme = InterfaceTheme.Dark;
+        if (!Enum.IsDefined(typeof(WordAnimationStyle), s.WordAnimation))
+            s.WordAnimation = WordAnimationStyle.Fade;
         s.SoundSenseIntensity = Clamp(s.SoundSenseIntensity, 0.0, 1.0, 0.7);
         s.WordMotionStrength = Clamp(s.WordMotionStrength, 0.0, 1.0, 0.65);
         s.AnimationSoftness = Clamp(s.AnimationSoftness, 0, 100, 50);
         s.GlobalOffsetMs = Clamp(s.GlobalOffsetMs, -OffsetLimitMs, OffsetLimitMs, 0);
+        s.MobilePresetIndex = Math.Clamp(s.MobilePresetIndex, 0, 4);
+
+        s.LyricsFontFamily = CleanSetting(s.LyricsFontFamily, 128, "Segoe UI Variable Display");
+        s.LyricsFontWeight = CleanSetting(s.LyricsFontWeight, 32, "SemiBold");
+        if (s.PreferredSourceAppId is { Length: > MaxTextChars })
+            s.PreferredSourceAppId = s.PreferredSourceAppId[..MaxTextChars];
 
         if (s.PerTrackOffsetMs is null)
         {
@@ -131,23 +157,97 @@ public sealed class SettingsService : IAppSettingsStore
         }
         else
         {
-            List<string>? stale = null;
-            foreach (var entry in s.PerTrackOffsetMs)
-            {
-                if (!string.IsNullOrWhiteSpace(entry.Key)) continue;
-                (stale ??= new List<string>()).Add(entry.Key);
-            }
-            // Reescribir un valor mientras se enumera el diccionario lanzaría InvalidOperationException.
-            if (stale is not null)
-            {
-                foreach (var key in stale) s.PerTrackOffsetMs.Remove(key);
-            }
+            var kept = 0;
             var keys = new List<string>(s.PerTrackOffsetMs.Keys);
             foreach (var key in keys)
-                s.PerTrackOffsetMs[key] = Clamp(s.PerTrackOffsetMs[key], -OffsetLimitMs, OffsetLimitMs, 0);
+            {
+                if (string.IsNullOrWhiteSpace(key) || key.Length > MaxKeyChars ||
+                    kept >= MaxDictionaryEntries)
+                {
+                    s.PerTrackOffsetMs.Remove(key);
+                    continue;
+                }
+                // Reescribir un valor mientras se enumera el diccionario lanzaría InvalidOperationException.
+                s.PerTrackOffsetMs[key] = Clamp(s.PerTrackOffsetMs[key],
+                    -OffsetLimitMs, OffsetLimitMs, 0);
+                kept++;
+            }
         }
 
-        if (s.ManualOverrides is null) s.ManualOverrides = new Dictionary<string, long>();
+        if (s.ManualOverrides is null)
+        {
+            s.ManualOverrides = new Dictionary<string, long>();
+        }
+        else
+        {
+            var kept = 0;
+            var keys = new List<string>(s.ManualOverrides.Keys);
+            foreach (var key in keys)
+            {
+                if (string.IsNullOrWhiteSpace(key) || key.Length > MaxKeyChars ||
+                    kept >= MaxDictionaryEntries || s.ManualOverrides[key] <= 0)
+                {
+                    s.ManualOverrides.Remove(key);
+                    continue;
+                }
+                kept++;
+            }
+        }
+
+        NormalizeExtras(s);
+    }
+
+    // 0.9.40 settings. A hand-edited or damaged settings.json must not leave
+    // null dictionaries or out-of-range values.
+    static void NormalizeExtras(AppSettings s)
+    {
+        s.PerLineOffsetMs ??= new Dictionary<string, Dictionary<string, int>>();
+        var tracks = 0;
+        foreach (var key in new List<string>(s.PerLineOffsetMs.Keys))
+        {
+            var map = s.PerLineOffsetMs[key];
+            if (string.IsNullOrWhiteSpace(key) || key.Length > MaxKeyChars || map is null ||
+                tracks >= MaxDictionaryEntries)
+            {
+                s.PerLineOffsetMs.Remove(key);
+                continue;
+            }
+            foreach (var lineKey in new List<string>(map.Keys))
+            {
+                if (lineKey.Length is 0 or > 16 || map.Count > 2000)
+                {
+                    map.Remove(lineKey);
+                    continue;
+                }
+                map[lineKey] = Clamp(map[lineKey], -LyricsService.MaxLineOffsetMs, LyricsService.MaxLineOffsetMs, 0);
+            }
+            if (map.Count == 0) s.PerLineOffsetMs.Remove(key);
+            else tracks++;
+        }
+
+        s.ManualPins ??= new Dictionary<string, string>();
+        var pins = 0;
+        foreach (var key in new List<string>(s.ManualPins.Keys))
+        {
+            if (string.IsNullOrWhiteSpace(key) || key.Length > MaxKeyChars || pins >= MaxDictionaryEntries ||
+                s.ManualPins[key] is not ("Lrcmux" or "LyricsPlus"))
+            {
+                s.ManualPins.Remove(key);
+                continue;
+            }
+            pins++;
+        }
+
+        if (s.ObsOverlayPort is < 1024 or > 65535) s.ObsOverlayPort = 7531;
+        if (s.MiniLyricsLeft is { } left && !double.IsFinite(left)) s.MiniLyricsLeft = null;
+        if (s.MiniLyricsTop is { } top && !double.IsFinite(top)) s.MiniLyricsTop = null;
+    }
+
+    static string CleanSetting(string? value, int maxLength, string fallback)
+    {
+        var text = value?.Trim() ?? "";
+        if (text.Length == 0) return fallback;
+        return text.Length <= maxLength ? text : fallback;
     }
 
     static double Clamp(double value, double min, double max, double fallback) =>
