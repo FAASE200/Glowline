@@ -34,7 +34,7 @@ jobs:
         run: dotnet build LyricGlow/LyricGlow.csproj -c Release
 
       - name: Publicar build portable
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'push'
         run: >
           dotnet publish LyricGlow/LyricGlow.csproj -c Release -r win-x64
           --self-contained true -p:PublishSingleFile=true
@@ -42,7 +42,7 @@ jobs:
           -p:IncludeNativeLibrariesForSelfExtract=true -o publish
 
       - name: Subir artefacto
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: Glowline-portable-win-x64
