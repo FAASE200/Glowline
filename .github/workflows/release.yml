@@ -84,6 +84,10 @@ jobs:
         shell: pwsh
         run: ./Glowline/tools/build-installers.ps1 -Version ${{ steps.version.outputs.version }} -PublishDir "$PWD/Glowline/publish"
 
+      - name: Publish the 0.9.30 bridge
+        if: steps.version.outputs.ready == 'true'
+        run: dotnet publish Glowline.Bridge/Glowline.Bridge.csproj -c Release -o bridge-out
+
       - name: Collect release assets
         if: steps.version.outputs.ready == 'true'
         id: assets
@@ -93,6 +97,9 @@ jobs:
           $out = New-Item -ItemType Directory -Force release-assets
           Copy-Item "Glowline/publish/GlowlineSetup-$version.exe" $out
           Copy-Item "Glowline/publish/Glowline.exe" (Join-Path $out "Glowline-$version-portable.exe")
+          # 0.9.30 only reads the latest release and only installs this file
+          # name. It gets the bridge, which installs this Glowline version.
+          Copy-Item bridge-out/GlowlineBridge.exe (Join-Path $out "LyricGlowSetup-$version.exe")
           Get-ChildItem $out | ForEach-Object {
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
             "{0,-36} {1}" -f $_.Name, $hash
