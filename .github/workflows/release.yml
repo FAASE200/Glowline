@@ -1,0 +1,96 @@
+name: Release
+
+# Builds the Windows installer and portable app for a version tag (v1.2.3)
+# and creates a draft GitHub release with the notes from
+# docs/release-notes/<version>.md. Publishing the draft is a manual step, so
+# the in-app updater only offers a build once someone has checked it.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build (for example v0.9.40)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Build and draft release
+    runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content LyricGlow/LyricGlow.csproj
+          $version = [string]@($project.Project.PropertyGroup.Version)[0]
+          if ("v$version" -ne $env:TAG) { throw "Tag $env:TAG does not match project version $version" }
+          $notes = "docs/release-notes/$version.md"
+          if (-not (Test-Path $notes)) { throw "Missing $notes" }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "notes=$notes" >> $env:GITHUB_OUTPUT
+
+      - name: Test LyricGlow.Core
+        run: dotnet run --project LyricGlow.Core.Tests/LyricGlow.Core.Tests.csproj -c Release
+
+      - name: Publish the Windows app
+        run: >
+          dotnet publish LyricGlow/LyricGlow.csproj -c Release -r win-x64
+          --self-contained true -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true -o LyricGlow/publish
+
+      - name: Install WiX 5
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add -g WixToolset.BootstrapperApplications.wixext/5.0.2
+
+      - name: Build installers
+        shell: pwsh
+        run: ./LyricGlow/tools/build-installers.ps1 -Version ${{ steps.version.outputs.version }} -PublishDir "$PWD/LyricGlow/publish"
+
+      - name: Collect release assets
+        id: assets
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $out = New-Item -ItemType Directory -Force release-assets
+          Copy-Item "LyricGlow/publish/LyricGlowSetup-$version.exe" $out
+          Copy-Item "LyricGlow/publish/LyricGlow.exe" (Join-Path $out "Glowline-$version-portable.exe")
+          Get-ChildItem $out | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
+            "{0,-36} {1}" -f $_.Name, $hash
+          } | Tee-Object -FilePath hashes.txt
+
+      - name: Create draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $notes = Get-Content "${{ steps.version.outputs.notes }}" -Raw -Encoding UTF8
+          $hashes = Get-Content hashes.txt -Raw
+          $body = "$notes`n### SHA-256`n`n``````text`n$hashes``````"
+          Set-Content release-body.md $body -Encoding UTF8
+          $title = if (([version]$version).Major -lt 1) { "$env:TAG Alpha" } else { "Glowline $env:TAG" }
+          gh release create $env:TAG --draft --verify-tag --title $title --notes-file release-body.md (Get-ChildItem release-assets).FullName
