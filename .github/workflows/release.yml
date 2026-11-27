@@ -1,24 +1,20 @@
 name: Release
 
-# Builds the Windows installer and portable app for a version tag (v1.2.3)
-# and creates a draft GitHub release with the notes from
-# docs/release-notes/<version>.md. Publishing the draft is a manual step, so
-# the in-app updater only offers a build once someone has checked it.
+# Pushing a release/<version> branch builds the Windows installer and the
+# portable app and creates a DRAFT GitHub release v<version> with the notes
+# from docs/release-notes/<version>.md. GitHub creates the tag when the draft
+# is published, which is a manual step: the in-app updater only offers a build
+# after someone has checked it.
 
 on:
   push:
-    tags: ['v*']
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing tag to build (for example v0.9.40)
-        required: true
+    branches: ['release/**']
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -28,11 +24,8 @@ jobs:
     env:
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
-      TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: refs/tags/${{ env.TAG }}
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -44,7 +37,9 @@ jobs:
         run: |
           [xml]$project = Get-Content LyricGlow/LyricGlow.csproj
           $version = [string]@($project.Project.PropertyGroup.Version)[0]
-          if ("v$version" -ne $env:TAG) { throw "Tag $env:TAG does not match project version $version" }
+          $branch = "${{ github.ref_name }}"
+          if ($branch -ne "release/$version") { throw "Branch $branch does not match project version $version" }
+          "TAG=v$version" >> $env:GITHUB_ENV
           $notes = "docs/release-notes/$version.md"
           if (-not (Test-Path $notes)) { throw "Missing $notes" }
           "version=$version" >> $env:GITHUB_OUTPUT
@@ -93,4 +88,14 @@ jobs:
           $body = "$notes`n### SHA-256`n`n``````text`n$hashes``````"
           Set-Content release-body.md $body -Encoding UTF8
           $title = if (([version]$version).Major -lt 1) { "$env:TAG Alpha" } else { "Glowline $env:TAG" }
-          gh release create $env:TAG --draft --verify-tag --title $title --notes-file release-body.md (Get-ChildItem release-assets).FullName
+
+          # Re-running replaces an earlier draft of the same version, but never
+          # touches a release that has already been published.
+          $existing = gh release view $env:TAG --json isDraft 2>$null | ConvertFrom-Json
+          if ($existing) {
+            if (-not $existing.isDraft) { throw "$env:TAG is already published; bump the version instead." }
+            gh release delete $env:TAG --yes
+          }
+
+          gh release create $env:TAG --draft --target $env:GITHUB_SHA --title $title `
+            --notes-file release-body.md (Get-ChildItem release-assets).FullName
