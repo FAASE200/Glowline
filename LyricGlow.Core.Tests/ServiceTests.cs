@@ -212,3 +212,14 @@ static class AppInfoTests
         Assert.True(http.DefaultRequestHeaders.UserAgent.TryParseAdd(AppInfo.UserAgent + " updater"));
     }
 }
+
+static class CoverArtTests
+{
+    [Test]
+    static void ResizesItunesArtworkUrls()
+    {
+        const string url = "https://is1-ssl.mzstatic.com/image/thumb/Music/v4/ab/cd/source/100x100bb.jpg";
+        Assert.Equal("https://is1-ssl.mzstatic.com/image/thumb/Music/v4/ab/cd/source/512x512bb.jpg",
+            CoverArtService.ArtworkAt(url, 512));
+    }
+}

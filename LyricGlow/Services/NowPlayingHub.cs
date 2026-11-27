@@ -25,7 +25,8 @@ public sealed class NowPlayingHub : IDisposable
         string Romanized,
         string Next,
         bool HasLyrics,
-        long CoverVersion);
+        long CoverVersion,
+        string CoverUrl = "");
 
     readonly DispatcherTimer _timer;
     readonly OverlayServer _overlay = new();
@@ -33,6 +34,7 @@ public sealed class NowPlayingHub : IDisposable
     CancellationTokenSource? _coverCts;
     string _coverKey = "";
     byte[]? _cover;
+    string _coverUrl = "";
     long _coverVersion;
     Snapshot? _last;
 
@@ -50,7 +52,10 @@ public sealed class NowPlayingHub : IDisposable
     public void Apply(AppSettings settings)
     {
         _overlay.SetEnabled(settings.ObsOverlayEnabled, settings.ObsOverlayPort);
+        var discordWasEnabled = _discord.IsEnabled;
         _discord.SetEnabled(settings.DiscordPresenceEnabled);
+        // Turning Discord on mid-song: look the cover up again to get its address.
+        if (_discord.IsEnabled && !discordWasEnabled) _coverKey = "";
         var any = settings.ObsOverlayEnabled || settings.DiscordPresenceEnabled;
         if (any && !_timer.IsEnabled)
         {
@@ -91,7 +96,7 @@ public sealed class NowPlayingHub : IDisposable
         }
 
         Publish(new Snapshot(track.Key, track.Title, track.Artist, track.Album, lyrics.IsPlaying,
-            position, track.DurationSeconds, line, romanized, next, hasLyrics, _coverVersion));
+            position, track.DurationSeconds, line, romanized, next, hasLyrics, _coverVersion, _coverUrl));
     }
 
     void Publish(Snapshot snapshot)
@@ -105,7 +110,8 @@ public sealed class NowPlayingHub : IDisposable
                              last.Title != snapshot.Title ||
                              last.Artist != snapshot.Artist ||
                              last.Album != snapshot.Album ||
-                             last.Duration != snapshot.Duration;
+                             last.Duration != snapshot.Duration ||
+                             last.CoverUrl != snapshot.CoverUrl;
         // Between two ticks (200 ms) the position barely moves; a big jump is a seek.
         var expected = last is null ? 0 : last.Position + (last.Playing ? 0.2 : 0);
         var seeked = last is not null && last.TrackKey == snapshot.TrackKey &&
@@ -119,6 +125,7 @@ public sealed class NowPlayingHub : IDisposable
     {
         _coverKey = track.Key;
         _cover = null;
+        _coverUrl = "";
         _coverVersion++;
         _coverCts?.Cancel();
         var cts = new CancellationTokenSource();
@@ -129,6 +136,14 @@ public sealed class NowPlayingHub : IDisposable
             if (cts.IsCancellationRequested || _coverKey != track.Key) return;
             _cover = result.HasImage ? result.Bytes : null;
             _coverVersion++;
+
+            // Discord can only show covers that have a public https address.
+            if (_discord.IsEnabled)
+            {
+                var url = await App.CoverArt.FindPublicArtworkUrlAsync(track, cts.Token);
+                if (cts.IsCancellationRequested || _coverKey != track.Key) return;
+                _coverUrl = url;
+            }
         }
         catch (OperationCanceledException)
         {

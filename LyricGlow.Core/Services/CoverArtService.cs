@@ -25,6 +25,11 @@ public sealed class CoverArtResult
     public string Album { get; init; } = "";
     public string Artist { get; init; } = "";
     public string Title { get; init; } = "";
+    /// <summary>
+    /// Public https address of the image when it came from iTunes or Deezer
+    /// (used for the Discord status). Empty for the player's own thumbnail.
+    /// </summary>
+    public string ImageUrl { get; init; } = "";
     public int PixelWidth { get; init; }
     public int PixelHeight { get; init; }
     public bool HasImage => Bytes is { Length: > 0 };
@@ -137,6 +142,28 @@ public sealed class CoverArtService
                     _inflight.TryRemove(new KeyValuePair<string, Task<CoverArtResult>>(key, task)),
                     TaskScheduler.Default);
         }
+    }
+
+    const int PublicArtworkSide = 512;
+    readonly ConcurrentDictionary<string, string> _publicUrls = new();
+
+    /// <summary>
+    /// Public https address of the cover for the Discord status, or "" when
+    /// none is known. Reuses the cover lookup; if the cover came from the
+    /// player itself, asks iTunes for the address only (no image download).
+    /// </summary>
+    public async Task<string> FindPublicArtworkUrlAsync(TrackInfo track, CancellationToken ct)
+    {
+        var cover = await GetAsync(track, ct);
+        if (cover.ImageUrl.Length > 0) return cover.ImageUrl;
+
+        var key = CacheKey(track);
+        if (_publicUrls.TryGetValue(key, out var known)) return known;
+        var lookup = await TryItunesAsync(track, ct, includeAlbum: true, download: false);
+        var url = IsArtworkUrl(lookup.ImageUrl) ? lookup.ImageUrl : "";
+        if (_publicUrls.Count > 500) _publicUrls.Clear();
+        _publicUrls[key] = url;
+        return url;
     }
 
     static TimeSpan MemoryTtl(CoverArtResult result) =>
@@ -380,12 +407,35 @@ public sealed class CoverArtService
 
     static CoverArtResult PickBetter(CoverArtResult candidate, CoverArtResult current)
     {
+        var chosen = PickBetterImage(candidate, current);
+        // The same song matched online: keep its public address even if the
+        // player's thumbnail is the sharper image.
+        if (ReferenceEquals(chosen, current) && chosen.ImageUrl.Length == 0 && candidate.ImageUrl.Length > 0)
+            return WithImageUrl(chosen, candidate.ImageUrl);
+        return chosen;
+    }
+
+    static CoverArtResult WithImageUrl(CoverArtResult result, string imageUrl) => new()
+    {
+        Bytes = result.Bytes,
+        Source = result.Source,
+        Album = result.Album,
+        Artist = result.Artist,
+        Title = result.Title,
+        ImageUrl = imageUrl,
+        PixelWidth = result.PixelWidth,
+        PixelHeight = result.PixelHeight,
+    };
+
+    static CoverArtResult PickBetterImage(CoverArtResult candidate, CoverArtResult current)
+    {
         if (!candidate.HasImage) return current;
         if (!current.HasImage) return candidate;
         return candidate.MinSide >= current.MinSide ? candidate : current;
     }
 
-    async Task<CoverArtResult> TryItunesAsync(TrackInfo track, CancellationToken ct, bool includeAlbum = true)
+    async Task<CoverArtResult> TryItunesAsync(
+        TrackInfo track, CancellationToken ct, bool includeAlbum = true, bool download = true)
     {
         if (DateTime.UtcNow < _itunesCooldownUntil) return new CoverArtResult();
 
@@ -454,10 +504,23 @@ public sealed class CoverArtService
                 if (includeAlbum && !string.IsNullOrWhiteSpace(track.Album))
                 {
                     Log.Write($"cover: iTunes sin coincidencia con álbum para '{track.DisplayName}'; reintento artista+título");
-                    return await TryItunesAsync(track, ct, includeAlbum: false);
+                    return await TryItunesAsync(track, ct, includeAlbum: false, download);
                 }
                 Log.Write($"cover: iTunes sin coincidencia para '{track.DisplayName}'");
                 return new CoverArtResult();
+            }
+
+            if (!download)
+            {
+                // Only the public address is needed (Discord status): skip the download.
+                return new CoverArtResult
+                {
+                    Source = "iTunes",
+                    Album = bestAlbum,
+                    Artist = bestArtist,
+                    Title = bestTitle,
+                    ImageUrl = ArtworkAt(artwork, PublicArtworkSide),
+                };
             }
 
             byte[]? bytes = null;
@@ -471,7 +534,7 @@ public sealed class CoverArtService
                 Log.Write($"cover: iTunes sin imagen descargable para '{track.DisplayName}'");
                 return new CoverArtResult();
             }
-            return MakeResult(bytes, "iTunes", bestAlbum, bestArtist, bestTitle);
+            return MakeResult(bytes, "iTunes", bestAlbum, bestArtist, bestTitle, ArtworkAt(artwork, PublicArtworkSide));
         }
         catch (OperationCanceledException)
         {
@@ -554,7 +617,7 @@ public sealed class CoverArtService
                 return new CoverArtResult();
             }
             var bytes = await DownloadImageAsync(artwork, ct);
-            return MakeResult(bytes, "Deezer", bestAlbum, bestArtist, bestTitle);
+            return MakeResult(bytes, "Deezer", bestAlbum, bestArtist, bestTitle, artwork);
         }
         catch (OperationCanceledException)
         {
@@ -629,7 +692,7 @@ public sealed class CoverArtService
             }
             return bytes is null
                 ? new CoverArtResult()
-                : MakeResult(bytes, "iTunes", bestAlbum, bestArtist, "");
+                : MakeResult(bytes, "iTunes", bestAlbum, bestArtist, "", ArtworkAt(artwork, PublicArtworkSide));
         }
         catch (OperationCanceledException)
         {
@@ -693,7 +756,7 @@ public sealed class CoverArtService
             var bytes = await DownloadImageAsync(artwork, ct);
             return bytes is null
                 ? new CoverArtResult()
-                : MakeResult(bytes, "Deezer", bestAlbum, bestArtist, "");
+                : MakeResult(bytes, "Deezer", bestAlbum, bestArtist, "", artwork);
         }
         catch (OperationCanceledException)
         {
@@ -875,7 +938,7 @@ public sealed class CoverArtService
         return builder.ToString().Normalize(NormalizationForm.FormC);
     }
 
-    static string ArtworkAt(string artworkUrl, int size) =>
+    internal static string ArtworkAt(string artworkUrl, int size) =>
         ArtworkSize.Replace(artworkUrl, $"/{size}x{size}bb.$4");
 
     static string GetString(JsonElement element, string name) =>
@@ -891,7 +954,8 @@ public sealed class CoverArtService
         (long)width * height <= MaxImagePixels;
 
     CoverArtResult MakeResult(
-        byte[]? bytes, string source, string album = "", string artist = "", string title = "")
+        byte[]? bytes, string source, string album = "", string artist = "", string title = "",
+        string imageUrl = "")
     {
         if (bytes is not { Length: > 0 }) return new CoverArtResult();
         var (width, height) = ImageSize(bytes);
@@ -907,6 +971,7 @@ public sealed class CoverArtService
             Album = album,
             Artist = artist,
             Title = title,
+            ImageUrl = imageUrl,
             PixelWidth = width,
             PixelHeight = height,
         };
@@ -956,6 +1021,7 @@ public sealed class CoverArtService
                 var album = "";
                 var artist = "";
                 var title = "";
+                var imageUrl = "";
                 var metaPath = path + ".json";
                 if (File.Exists(metaPath))
                 {
@@ -969,13 +1035,15 @@ public sealed class CoverArtService
                             album = GetString(meta.RootElement, "album");
                             artist = GetString(meta.RootElement, "artist");
                             title = GetString(meta.RootElement, "title");
+                            imageUrl = GetString(meta.RootElement, "url");
+                            if (!IsArtworkUrl(imageUrl)) imageUrl = "";
                         }
                     }
                     catch
                     {
                     }
                 }
-                return MakeResult(bytes, source, album, artist, title);
+                return MakeResult(bytes, source, album, artist, title, imageUrl);
             }
             catch
             {
@@ -1000,6 +1068,7 @@ public sealed class CoverArtService
                 album = result.Album,
                 artist = result.Artist,
                 title = result.Title,
+                url = result.ImageUrl,
             }));
             PruneCovers();
         }

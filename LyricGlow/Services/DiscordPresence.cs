@@ -36,6 +36,8 @@ public sealed class DiscordPresence : IDisposable
 
     public bool IsConnected => _pipe?.IsConnected == true;
 
+    public bool IsEnabled => _enabled;
+
     public void SetEnabled(bool enabled)
     {
         enabled &= IsConfigured;
@@ -99,7 +101,17 @@ public sealed class DiscordPresence : IDisposable
                     timestamps = end is null
                         ? (object)new { start = start.ToUnixTimeMilliseconds() }
                         : new { start = start.ToUnixTimeMilliseconds(), end = end.Value },
-                    assets = new { large_image = "glowline", large_text = Clip(s.Album.Length > 0 ? s.Album : "Glowline") },
+                    // The song's cover when it has a public address, with the Glowline
+                    // icon as a small badge; otherwise just the Glowline icon.
+                    assets = IsUsableImageUrl(s.CoverUrl)
+                        ? (object)new
+                        {
+                            large_image = s.CoverUrl,
+                            large_text = Clip(s.Album.Length > 0 ? s.Album : s.Title),
+                            small_image = "glowline",
+                            small_text = "Glowline",
+                        }
+                        : new { large_image = "glowline", large_text = Clip(s.Album.Length > 0 ? s.Album : "Glowline") },
                 };
             }
 
@@ -210,6 +222,11 @@ public sealed class DiscordPresence : IDisposable
         }
         Close();
     }
+
+    // Discord accepts external images as https links of up to 256 characters.
+    internal static bool IsUsableImageUrl(string url) =>
+        url.Length is > 0 and <= 256 &&
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
 
     static string Clip(string text) => text.Length <= 120 ? (text.Length < 2 ? text + "  " : text) : text[..117] + "...";
 
