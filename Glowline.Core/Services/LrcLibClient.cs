@@ -64,12 +64,12 @@ public sealed class LrcLibClient
 
             using var doc = await ExternalHttp.ReadJsonAsync(resp, ExternalHttp.MaxJsonBytes, ct);
             if (doc.RootElement.ValueKind != JsonValueKind.Object)
-                throw new ExternalDataException("LRCLIB devolvió un objeto inesperado.");
+                throw new ExternalDataException("LRCLIB returned an unexpected object.");
 
             var track = doc.RootElement.Deserialize<LrclibTrack>(JsonOpts);
             if (!ValidateTrack(track))
             {
-                Log.Write("LRCLIB: respuesta rechazada por validación");
+                Log.Write("LRCLIB: response rejected by validation");
                 return null;
             }
             return track;
@@ -101,7 +101,7 @@ public sealed class LrcLibClient
 
             using var doc = await ExternalHttp.ReadJsonAsync(resp, ExternalHttp.MaxJsonBytes, ct);
             if (doc.RootElement.ValueKind != JsonValueKind.Array)
-                throw new ExternalDataException("LRCLIB search no devolvió una lista.");
+                throw new ExternalDataException("LRCLIB search did not return a list.");
 
             var results = new List<LrclibTrack>();
             foreach (var item in doc.RootElement.EnumerateArray())

@@ -227,8 +227,8 @@ public partial class FullscreenWindow
         }
     }
 
-    // 26% es el tamaño histórico; el resto del recorrido escala sobre esa base
-    // para que el ajuste siga teniendo efecto aunque la ventana sea grande.
+    // 26% is the historical size; the rest of the range scales from that base
+    // so the setting still has an effect even when the window is large.
     static double ScaledCoverSide(double width, double height, double percent, bool light)
     {
         var baseline = light

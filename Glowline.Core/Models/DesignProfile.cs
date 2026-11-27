@@ -148,7 +148,7 @@ public sealed class DesignArtwork : DesignModel
         }
     }
 
-    // Sin valor propio (0) la carátula animada hereda el tamaño estático.
+    // With no value of its own (0) the animated cover inherits the static size.
     public double AnimatedSizePercent
     {
         get => _animatedSizePercent > 0

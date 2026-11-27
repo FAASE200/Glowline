@@ -20,7 +20,7 @@ public static class LyricsFileParser
         if (string.IsNullOrWhiteSpace(lyricsFile)) return null;
         if (lyricsFile.Length > MaxInputChars)
         {
-            Log.Write("lyricsfile: entrada excede el límite");
+            Log.Write("lyricsfile: input exceeds the limit");
             return null;
         }
 
@@ -73,7 +73,7 @@ public static class LyricsFileParser
         var rawLines = lyricsFile.Replace("\r", "").Split('\n');
         if (rawLines.Length > MaxLines)
         {
-            Log.Write("lyricsfile: demasiadas líneas");
+            Log.Write("lyricsfile: too many lines");
             return null;
         }
 
@@ -115,7 +115,7 @@ public static class LyricsFileParser
         FlushLine();
         if (invalid)
         {
-            Log.Write("lyricsfile: contenido inválido");
+            Log.Write("lyricsfile: invalid content");
             return null;
         }
 

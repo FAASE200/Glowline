@@ -130,7 +130,7 @@ public static class CoverPalette
                 (byte)Math.Round(sumG / (double)count),
                 (byte)Math.Round(sumB / (double)count));
 
-            // Fondo fijo = mismo color dominante en todo el marco, no solo en promedio.
+            // Solid background = the same dominant color across the whole frame, not just on average.
             var fixedBackground = histogram[dominant] / (double)total >= 0.85;
             if (fixedBackground)
             {

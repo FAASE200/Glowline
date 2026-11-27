@@ -72,7 +72,7 @@ public sealed class LyricsPlusClient
 
             using var doc = await ExternalHttp.ReadJsonAsync(response, ExternalHttp.MaxJsonBytes, ct);
             if (doc.RootElement.ValueKind != JsonValueKind.Object)
-                throw new ExternalDataException("LyricsPlus devolvió un objeto inesperado.");
+                throw new ExternalDataException("LyricsPlus returned an unexpected object.");
 
             var payload = doc.RootElement.Deserialize<ApiResponse>(JsonOptions);
             return ToTrack(payload, title, artist);
@@ -101,7 +101,7 @@ public sealed class LyricsPlusClient
         if (response?.Lyrics is not { Count: > 0 } lyricEntries) return null;
         if (lyricEntries.Count > MaxLines)
         {
-            Log.Write($"LyricsPlus: {lyricEntries.Count} líneas exceden el límite");
+            Log.Write($"LyricsPlus: {lyricEntries.Count} lines exceed the limit");
             return null;
         }
 
@@ -124,7 +124,7 @@ public sealed class LyricsPlusClient
         if (lines.Count == 0) return null;
         if (lines.Sum(line => line.Syllabus?.Count ?? 0) > ExternalHttp.MaxLyricWords)
         {
-            Log.Write("LyricsPlus: demasiadas sílabas");
+            Log.Write("LyricsPlus: too many syllables");
             return null;
         }
 
@@ -133,7 +133,7 @@ public sealed class LyricsPlusClient
         if (synced.Length > ExternalHttp.MaxLyricsChars ||
             !ExternalHttp.LyricsTextOk(plain, out _))
         {
-            Log.Write("LyricsPlus: letra excede el límite");
+            Log.Write("LyricsPlus: lyrics exceed the limit");
             return null;
         }
         if (synced.Length == 0 && plain.Length == 0) return null;

@@ -14,8 +14,8 @@ public sealed class DesignService
     {
         _active = initial is null ? new DesignProfile() : Clone(initial);
         Normalize(_active);
-        // Los perfiles de escritorio sin editar conservan Adaptativo (que elige
-        // cine o dos columnas según la carátula) y alinean las letras a la izquierda.
+        // Unedited desktop profiles keep Adaptive (which picks
+        // cinema or two columns depending on the cover) and left-align the lyrics.
         if (IsLegacyDefault(_active))
             ApplyDesktopDefaults(_active);
     }
@@ -82,7 +82,7 @@ public sealed class DesignService
         profile.Animations ??= new DesignAnimations();
         profile.Controls ??= new DesignControls();
         profile.Artwork.SizePercent = SanitizeArtworkSize(profile.Artwork.SizePercent);
-        // Materializa el tamaño animado heredado para que ambos ajustes sean independientes.
+        // Materializes the inherited animated size so both settings are independent.
         profile.Artwork.AnimatedSizePercent = SanitizeArtworkSize(profile.Artwork.AnimatedSizePercent);
         profile.Name = SanitizeText(profile.Name, 200, "Mi diseño");
         profile.Author = SanitizeText(profile.Author, 200, "");

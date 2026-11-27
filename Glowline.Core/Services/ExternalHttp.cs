@@ -24,7 +24,7 @@ public sealed class ExternalHostPolicy
         foreach (var suffix in suffixes)
         {
             var value = suffix.Trim().TrimStart('.').ToLowerInvariant();
-            if (value.Length == 0) throw new ArgumentException("Host vacío", nameof(suffixes));
+            if (value.Length == 0) throw new ArgumentException("Empty host", nameof(suffixes));
             cleaned.Add(value);
         }
         _suffixes = cleaned.ToArray();
@@ -51,7 +51,7 @@ public sealed class ExternalHostPolicy
     public Uri Require(string raw)
     {
         if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri) || !Allows(uri))
-            throw new ExternalDataException("URL externa no permitida.");
+            throw new ExternalDataException("External URL not allowed.");
         return uri;
     }
 }
@@ -98,7 +98,7 @@ public static class ExternalHttp
         for (var hop = 0; hop <= MaxRedirects; hop++)
         {
             if (!policy.Allows(current))
-                throw new ExternalDataException("Host externo no permitido.");
+                throw new ExternalDataException("External host not allowed.");
 
             using var request = new HttpRequestMessage(HttpMethod.Get, current);
             configure?.Invoke(request);
@@ -110,7 +110,7 @@ public static class ExternalHttp
             var location = response.Headers.Location;
             response.Dispose();
             if (location is null)
-                throw new ExternalDataException("Redirección externa sin destino.");
+                throw new ExternalDataException("External redirect has no target.");
 
             current = location.IsAbsoluteUri ? location : new Uri(current, location);
         }
@@ -133,20 +133,20 @@ public static class ExternalHttp
     public static void EnsureJsonContentType(HttpResponseMessage response, bool allowJavaScript = false)
     {
         if (!IsJsonMediaType(response.Content.Headers.ContentType?.MediaType, allowJavaScript))
-            throw new ExternalDataException("El servicio no devolvió JSON.");
+            throw new ExternalDataException("The service did not return JSON.");
     }
 
     public static void EnsureContentType(HttpResponseMessage response, params string[] allowedMediaTypes)
     {
         var actual = response.Content.Headers.ContentType?.MediaType;
         if (string.IsNullOrWhiteSpace(actual))
-            throw new ExternalDataException("Respuesta externa sin tipo de contenido.");
+            throw new ExternalDataException("External response has no content type.");
 
         foreach (var allowed in allowedMediaTypes)
         {
             if (string.Equals(actual, allowed, StringComparison.OrdinalIgnoreCase)) return;
         }
-        throw new ExternalDataException("Tipo de contenido externo no permitido: " + actual);
+        throw new ExternalDataException("External content type not allowed: " + actual);
     }
 
     public static async Task<byte[]> ReadBytesAsync(
@@ -194,7 +194,7 @@ public static class ExternalHttp
         }
         catch (JsonException ex)
         {
-            throw new ExternalDataException("JSON externo inválido: " + ex.Message);
+            throw new ExternalDataException("Invalid external JSON: " + ex.Message);
         }
     }
 
@@ -224,7 +224,7 @@ public static class ExternalHttp
         if (string.IsNullOrEmpty(text)) return true;
         if (text.Length > MaxLyricsChars)
         {
-            reason = "letras demasiado largas";
+            reason = "lyrics too long";
             return false;
         }
         var lines = 1;
@@ -232,7 +232,7 @@ public static class ExternalHttp
         {
             if (ch == '\n' && ++lines > 2000)
             {
-                reason = "demasiadas líneas";
+                reason = "too many lines";
                 return false;
             }
         }

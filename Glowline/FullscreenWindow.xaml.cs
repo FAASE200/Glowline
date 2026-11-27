@@ -806,7 +806,7 @@ public partial class FullscreenWindow : Window
         if (track.Key != _artKey)
         {
             var keepArt = CoverArtService.SameAlbum(track.Album, _artAlbum) &&
-                          (_artSource != "Reproductor" || _artHighRes);
+                          (_artSource != "Player" || _artHighRes);
             _artKey = track.Key;
             _artLoaded = keepArt;
             _artNextAt = DateTime.Now;

@@ -349,8 +349,8 @@ public partial class FullscreenWindow
     {
         if (!_isOpen) return;
         UpdateSettingsPanelSize();
-        // Durante la transición de tamaño el reflow se difiere al final para no
-        // reconstruir todos los bloques en cada fotograma.
+        // During a size transition the reflow is deferred to the end so it doesn't
+        // rebuild every block on every frame.
         if (_coverSizeAnimating) return;
         LayoutBlocks();
         _scrollOffset = CenterTarget();

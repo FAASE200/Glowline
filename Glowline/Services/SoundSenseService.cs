@@ -15,8 +15,8 @@ public sealed class SoundSenseService : IDisposable
 
     readonly object _gate = new();
     readonly float[] _history = new float[HistorySize];
-    // El autocorrelator de BPM corre cada 2 s; reutilizar el buffer evita
-    // asignar un double[] nuevo en cada pasada.
+    // The BPM autocorrelator runs every 2 s; reusing the buffer avoids
+    // allocating a new double[] on every pass.
     readonly double[] _bpmScratch = new double[HistorySize];
 
     WasapiLoopbackCapture? _capture;
@@ -312,8 +312,8 @@ public sealed class SoundSenseService : IDisposable
 
             UpdateVisualBandsLocked(rms, bassRms, midRms, trebleRms);
 
-            // Los beats se miden sobre el canal de bajos (pasa-bajos ~120 Hz):
-            // así una voz no dispara el brillo como si fuera un golpe.
+            // Beats are measured on the bass channel (~120 Hz low-pass),
+            // so a voice doesn't trigger the glow as if it were a hit.
             _fastBass += (bassRms - _fastBass) * 0.5f;
             _slowBass += (bassRms - _slowBass) * 0.012f;
             if (_slowBass <= 0f) _slowBass = bassRms;
@@ -356,8 +356,8 @@ public sealed class SoundSenseService : IDisposable
 
     void UpdateVisualBandsLocked(float rms, float bassRms, float midRms, float trebleRms)
     {
-        // Auto-gain lento por banda: el visualizador recibe niveles 0..1 relativos
-        // al pico reciente, no amplitudes absolutas que cambian con el volumen.
+        // Slow per-band auto-gain: the visualizer gets 0..1 levels relative
+        // to the recent peak, not absolute amplitudes that change with the volume.
         _bassPeak = Math.Max(bassRms, _bassPeak * 0.9985f);
         _midPeak = Math.Max(midRms, _midPeak * 0.9985f);
         _treblePeak = Math.Max(trebleRms, _treblePeak * 0.9985f);

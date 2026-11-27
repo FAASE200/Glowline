@@ -152,7 +152,7 @@ public partial class FullscreenWindow
         _animCts = cts;
         var key = track.Key;
         _animTrackKey = key;
-        Log.Write($"animated UI: buscando artista '{track.Artist}' + álbum '{track.Album}'");
+        Log.Write($"animated UI: looking up artist '{track.Artist}' + album '{track.Album}'");
         try
         {
             var result = await _animated.GetAsync(track, cts.Token);
@@ -246,7 +246,7 @@ public partial class FullscreenWindow
             ? element.NaturalDuration.TimeSpan.TotalSeconds.ToString("F2")
             : "auto";
         Log.Write($"animated UI: MediaOpened {element.NaturalVideoWidth}x{element.NaturalVideoHeight} " +
-                  $"duración={duration}");
+                  $"duration={duration}");
         _animatedReady = true;
         UpdateLightArtSize(animate: true);
         element.BeginAnimation(OpacityProperty, null);
@@ -444,7 +444,7 @@ public partial class FullscreenWindow
                 (byte)Math.Round((double)sumG / dominantCount),
                 (byte)Math.Round((double)sumB / dominantCount));
 
-            // Fondo fijo = mismo color dominante en todo el marco, no solo en promedio.
+            // Solid background = the same dominant color across the whole frame, not just on average.
             fixedBackground = dominantShare >= 0.85;
             if (fixedBackground)
             {

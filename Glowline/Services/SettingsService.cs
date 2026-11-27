@@ -17,7 +17,7 @@ public sealed class SettingsService : IAppSettingsStore
 
     const double MinFontScale = 0.6;
     const double MaxFontScale = 1.8;
-    // Los desplazamientos fuera de este rango no tienen sentido como corrección manual.
+    // Offsets outside this range make no sense as a manual correction.
     const int OffsetLimitMs = 5 * 60 * 1000;
     const long MaxSettingsBytes = 2L * 1024 * 1024;
     const int MaxDictionaryEntries = 2000;
@@ -63,14 +63,14 @@ public sealed class SettingsService : IAppSettingsStore
             if (!info.Exists || info.Length <= 0) return null;
             if (info.Length > MaxSettingsBytes)
             {
-                Log.Write("settings: archivo excede el límite y se ignora");
+                Log.Write("settings: file exceeds the limit and is ignored");
                 return null;
             }
             return JsonSerializer.Deserialize<AppSettings>(File.ReadAllBytes(_path), LoadOptions);
         }
         catch (Exception ex)
         {
-            // Sin copia del json ilegible se perderían todos los ajustes al guardar.
+            // Without a copy of the unreadable json every setting would be lost on save.
             Log.Write("settings parse: " + ex.Message);
             TryKeepCorruptBackup();
             return null;
@@ -86,7 +86,7 @@ public sealed class SettingsService : IAppSettingsStore
             var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
             var backup = $"{_path}.corrupt-{stamp}.bak";
             File.Copy(_path, backup, overwrite: false);
-            Log.Write($"settings: copia del archivo dañado en {backup}");
+            Log.Write($"settings: copy of the damaged file at {backup}");
         }
         catch (Exception ex)
         {
@@ -167,7 +167,7 @@ public sealed class SettingsService : IAppSettingsStore
                     s.PerTrackOffsetMs.Remove(key);
                     continue;
                 }
-                // Reescribir un valor mientras se enumera el diccionario lanzaría InvalidOperationException.
+                // Rewriting a value while enumerating the dictionary would throw InvalidOperationException.
                 s.PerTrackOffsetMs[key] = Clamp(s.PerTrackOffsetMs[key],
                     -OffsetLimitMs, OffsetLimitMs, 0);
                 kept++;

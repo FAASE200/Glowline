@@ -160,12 +160,14 @@ public sealed class MiniLyricsWindow : Window
             e.Handled = true;
         };
 
+        // Created before any handler that uses it, so the field is never read unassigned.
+        _timer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(60) };
+        _timer.Tick += (_, __) => Refresh();
+
         SourceInitialized += (_, __) => MakeToolWindow();
         Loaded += (_, __) => PlaceWindow();
         Closed += (_, __) => _timer.Stop();
 
-        _timer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(60) };
-        _timer.Tick += (_, __) => Refresh();
         _timer.Start();
         Refresh();
     }

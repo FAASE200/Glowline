@@ -16,7 +16,7 @@ if (-not $Version) {
 }
 
 $exe = Join-Path $publish 'Glowline.exe'
-if (-not (Test-Path $exe)) { throw "Falta $exe; publica la app primero" }
+if (-not (Test-Path $exe)) { throw "Missing $exe; publish the app first" }
 
 $msi = Join-Path $installer "Glowline-$Version.msi"
 $allUsersMsi = Join-Path $installer "Glowline-$Version-allusers.msi"
@@ -28,16 +28,16 @@ if ($LASTEXITCODE -ne 0) { throw 'WiX no pudo crear el MSI por usuario' }
 
 & $wix build (Join-Path $installer 'Glowline.wxs') -arch x64 `
     -d "Version=$Version" -d "Scope=perMachine" -d "ProjectDir=$root" -d "PublishDir=$publish" -o $allUsersMsi
-if ($LASTEXITCODE -ne 0) { throw 'WiX no pudo crear el MSI para todos los usuarios' }
+if ($LASTEXITCODE -ne 0) { throw 'WiX could not create the all-users MSI' }
 
 & $wix build (Join-Path $installer 'GlowlineBundle.wxs') -arch x64 `
     -ext WixToolset.BootstrapperApplications.wixext `
     -d "Version=$Version" -d "ProjectDir=$root" -d "MsiPath=$msi" -d "AllUsersMsiPath=$allUsersMsi" -o $setup
-if ($LASTEXITCODE -ne 0) { throw 'WiX no pudo crear el instalador EXE' }
+if ($LASTEXITCODE -ne 0) { throw 'WiX could not create the EXE installer' }
 
 Copy-Item $msi (Join-Path $publish (Split-Path $msi -Leaf)) -Force
 Copy-Item $setup (Join-Path $publish (Split-Path $setup -Leaf)) -Force
 
 Write-Host "MSI: $msi"
-Write-Host "MSI todos los usuarios: $allUsersMsi"
+Write-Host "All-users MSI: $allUsersMsi"
 Write-Host "EXE: $setup"

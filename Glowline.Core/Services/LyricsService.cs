@@ -136,8 +136,8 @@ public sealed class LyricsService
         _cts?.Cancel();
         var cts = new CancellationTokenSource();
         _cts = cts;
-        // Cada resolución recibe una generación: la activa es la mayor. Así una
-        // resolución cancelada o antigua no puede aplicar Error ni resultados.
+        // Each resolve gets a generation and the active one is the highest, so a
+        // cancelled or stale resolve cannot apply Error or results.
         var generation = ++_resolveGeneration;
 
         var source = _settings.Settings.LyricsSource;
@@ -300,7 +300,7 @@ public sealed class LyricsService
         if (found is null && !ignoreCache)
         {
             found = LoadCache(cacheKey);
-            // Los archivos guardados con la clave antigua siguen siendo válidos.
+            // Files saved with the old key are still valid.
             found ??= LoadCache(legacyCacheKey);
         }
 
@@ -331,7 +331,7 @@ public sealed class LyricsService
         }
 
         Log.Write(found is null
-            ? $"resolve[LRCLIB] '{track.DisplayName}' dur={track.DurationSeconds?.ToString("F0") ?? "-"} -> sin resultados"
+            ? $"resolve[LRCLIB] '{track.DisplayName}' dur={track.DurationSeconds?.ToString("F0") ?? "-"} -> no results"
             : $"resolve[LRCLIB] '{track.DisplayName}' dur={track.DurationSeconds?.ToString("F0") ?? "-"} -> '{found.TrackName}' / '{found.ArtistName}' ({found.Duration?.ToString("F0") ?? "?"}s, word={found.HasWordSync})");
 
         if (found is not null) SaveCache(cacheKey, found);
@@ -416,8 +416,8 @@ public sealed class LyricsService
         _ => trackKey,
     };
 
-    // La cache de LRCLIB distingue el álbum (normalizado) para no reutilizar
-    // la letra de un homónimo de otro disco. TrackInfo.Key no cambia.
+    // The LRCLIB cache tells albums apart (normalized) so it doesn't reuse
+    // the lyrics of a same-named song from another record. TrackInfo.Key is unchanged.
     static string AlbumCacheKey(LyricSource source, string trackKey, string album)
     {
         var normalized = TrackKey.Normalize(album);
@@ -439,8 +439,8 @@ public sealed class LyricsService
         var artist = TrackKey.Normalize(track.Artist);
         var album = TrackKey.Normalize(track.Album);
         double? duration = track.DurationSeconds;
-        // La penalización por álbum distinto solo tiene sentido si algún
-        // resultado trae álbum comparable; si no, no se desmerece a nadie.
+        // The different-album penalty only makes sense if some
+        // result has a comparable album; otherwise nobody is penalized.
         var anyAlbumMatch = album.Length > 0 && results.Any(r =>
             TrackKey.Normalize(r.AlbumName).Length > 0);
 
@@ -827,7 +827,7 @@ public sealed class LyricsService
     public void ApplyManual(LrclibTrack result)
     {
         if (Track is null) return;
-        // Invalida la resolución en curso para que no pise la elección manual.
+        // Invalidates the resolve in progress so it doesn't overwrite the manual pick.
         _resolveGeneration++;
         _cts?.Cancel();
         var key = Track.Key;

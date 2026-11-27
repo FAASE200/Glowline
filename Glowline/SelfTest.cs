@@ -307,7 +307,7 @@ internal static class SelfTest
             var wrongArtist = CoverArtService.Score(
                 coverTrack, "Alo", "Otro Artista", "Alo - Single", 145, out _);
             var wrongAlbum = CoverArtService.Score(
-                coverTrack, "Alo", "Katteyes & Sinaka", "Otro Álbum", 145, out _);
+                coverTrack, "Alo", "Katteyes & Sinaka", "Another Album", 145, out _);
             var similarTitle = CoverArtService.Score(
                 coverTrack, "Alo Alo", "Katteyes & Sinaka", "Alo - Single", 145, out _);
             Check(correctTitleOk && correctCover > 0,
@@ -317,17 +317,17 @@ internal static class SelfTest
             Check(double.IsNegativeInfinity(similarTitle), "cover rejects a similar but different title");
             Check(CoverArtService.SameAlbum("BORONDO", "BORONDO (Deluxe)"),
                 "cover reuses the same album artwork across editions");
-            Check(!CoverArtService.SameAlbum("BORONDO", "Otro álbum"),
+            Check(!CoverArtService.SameAlbum("BORONDO", "Another album"),
                 "cover does not reuse artwork from another album");
             Check(CoverArtService.CacheKey(coverTrack) != CoverArtService.CacheKey(new TrackInfo
                 {
                     Title = coverTrack.Title,
                     Artist = coverTrack.Artist,
-                    Album = "Otro Álbum",
+                    Album = "Another Album",
                     DurationSeconds = coverTrack.DurationSeconds,
                 }),
                 "cover cache separates albums with the same artist+title");
-            Check(!LyricsService.HasUsableSync(new LrclibTrack { PlainLyrics = "solo texto" }),
+            Check(!LyricsService.HasUsableSync(new LrclibTrack { PlainLyrics = "plain text only" }),
                 "plain lyrics need LRCLIB fallback");
             Check(LyricsService.HasUsableSync(new LrclibTrack
                 {

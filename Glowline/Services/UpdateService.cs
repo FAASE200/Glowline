@@ -156,7 +156,7 @@ public sealed class UpdateService
             {
                 if (!ReleaseClient.IsSha256Digest(asset.Digest))
                 {
-                    Log.Write($"update: digest ausente o inválido en {release.Tag} ({asset.Digest ?? "null"})");
+                    Log.Write($"update: missing or invalid digest in {release.Tag} ({asset.Digest ?? "null"})");
                     SetState(UpdatePhase.Failed, "UpdateHashMismatch");
                     return;
                 }

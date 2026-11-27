@@ -107,7 +107,7 @@ public sealed class ReleaseClient
 
         var tag = ExternalHttp.CleanText(GetString(root, "tag_name"), MaxTagChars);
         var version = ParseVersion(tag);
-        if (version is null) throw new InvalidDataException($"Versión de release no reconocida: {tag}");
+        if (version is null) throw new InvalidDataException($"Unrecognized release version: {tag}");
         var assets = new List<ReleaseAsset>();
         if (root.TryGetProperty("assets", out var nodes) && nodes.ValueKind == JsonValueKind.Array)
         {
@@ -154,12 +154,12 @@ public sealed class ReleaseClient
         using var doc = JsonDocument.Parse(json, ExternalHttp.JsonOptions);
         var root = doc.RootElement;
         if (root.ValueKind != JsonValueKind.Object)
-            throw new InvalidDataException("Manifest sin objeto raíz.");
+            throw new InvalidDataException("Manifest has no root object.");
 
         var tag = ExternalHttp.CleanText(GetStringAny(root, "tag", "tag_name"), MaxTagChars);
         var versionText = ExternalHttp.CleanText(GetStringAny(root, "version", "tag"), MaxTagChars);
         var version = ParseVersion(versionText) ?? ParseVersion(tag);
-        if (version is null) throw new InvalidDataException($"Versión de manifest no reconocida: {versionText}");
+        if (version is null) throw new InvalidDataException($"Unrecognized manifest version: {versionText}");
         if (tag.Length == 0) tag = "v" + Format(version);
 
         var assets = new List<ReleaseAsset>();
@@ -205,7 +205,7 @@ public sealed class ReleaseClient
         Action<double>? progress = null, CancellationToken ct = default)
     {
         var directory = Path.GetDirectoryName(Path.GetFullPath(destination));
-        if (string.IsNullOrEmpty(directory)) throw new IOException("Ruta de descarga no válida.");
+        if (string.IsNullOrEmpty(directory)) throw new IOException("Invalid download path.");
         Directory.CreateDirectory(directory);
         var part = destination + ".part";
         var direct = !string.IsNullOrWhiteSpace(asset.DownloadUrl);
@@ -215,7 +215,7 @@ public sealed class ReleaseClient
         using var response = await ExternalHttp.SendAsync(client, uri, policy, ct, request =>
         {
             if (direct) return;
-            // La API de assets devuelve metadatos JSON si no se pide el binario.
+            // The assets API returns JSON metadata unless the binary is requested.
             request.Headers.Accept.Clear();
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/octet-stream"));
         }).ConfigureAwait(false);
@@ -227,7 +227,7 @@ public sealed class ReleaseClient
 
         var total = response.Content.Headers.ContentLength ?? asset.Size;
         if (total > MaxDownloadBytes || (asset.Size > 0 && total > asset.Size + 1024 * 1024))
-            throw new InvalidDataException("El instalador excede el tamaño permitido.");
+            throw new InvalidDataException("The installer exceeds the allowed size.");
         double reported = 0;
         long readTotal = 0;
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -245,7 +245,7 @@ public sealed class ReleaseClient
                     {
                         output.Close();
                         try { File.Delete(part); } catch { }
-                        throw new InvalidDataException("El instalador excede el tamaño permitido.");
+                        throw new InvalidDataException("The installer exceeds the allowed size.");
                     }
                     await output.WriteAsync(buffer.AsMemory(0, read), ct);
                     hash.AppendData(buffer, 0, read);
@@ -268,13 +268,13 @@ public sealed class ReleaseClient
         if (asset.Size > 0 && readTotal != asset.Size)
         {
             try { File.Delete(part); } catch { }
-            throw new InvalidDataException("El tamaño descargado no coincide con el publicado.");
+            throw new InvalidDataException("The downloaded size does not match the published one.");
         }
         var hex = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
         if (!DigestMatches(asset.Digest, hex))
         {
             try { File.Delete(part); } catch { }
-            throw new InvalidDataException("La descarga no coincide con el hash SHA-256 de GitHub.");
+            throw new InvalidDataException("The download does not match the SHA-256 hash from GitHub.");
         }
         File.Move(part, destination, true);
         return destination;
