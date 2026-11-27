@@ -91,6 +91,7 @@ public partial class FullscreenWindow : Window
     bool _coverSizeAnimating;
 
     DateTime _lastFrame = DateTime.MinValue;
+    bool _frameHooked;
     DateTime _lastClockUi = DateTime.MinValue;
 
     FontFamily _fontFamily = new("Segoe UI Variable Display, Segoe UI");
@@ -196,7 +197,10 @@ public partial class FullscreenWindow : Window
         _lyrics.Changed += OnLyricsChanged;
         _media.SnapshotChanged += OnSnapshot;
         App.Designs.ActiveChanged += OnDesignChanged;
-        CompositionTarget.Rendering += OnFrame;
+        // While any Rendering handler is attached WPF redraws at the monitor's
+        // refresh rate, so the frame loop is only attached while it is visible.
+        IsVisibleChanged += (_, __) => SyncFrameLoop();
+        StateChanged += (_, __) => SyncFrameLoop();
         PreviewKeyDown += OnKeyDown;
         MouseMove += (_, __) =>
         {
@@ -220,6 +224,7 @@ public partial class FullscreenWindow : Window
         Closed += (_, __) =>
         {
             CompositionTarget.Rendering -= OnFrame;
+            _frameHooked = false;
             _lyrics.Changed -= OnLyricsChanged;
             _media.SnapshotChanged -= OnSnapshot;
             App.Designs.ActiveChanged -= OnDesignChanged;
@@ -276,6 +281,7 @@ public partial class FullscreenWindow : Window
     {
         if (_isOpen) return;
         _isOpen = true;
+        SyncFrameLoop();
         Opacity = 0;
         WindowState = WindowState.Normal;
         Left = 0;
@@ -806,7 +812,7 @@ public partial class FullscreenWindow : Window
         if (track.Key != _artKey)
         {
             var keepArt = CoverArtService.SameAlbum(track.Album, _artAlbum) &&
-                          (_artSource != "Reproductor" || _artHighRes);
+                          (_artSource != "Player" || _artHighRes);
             _artKey = track.Key;
             _artLoaded = keepArt;
             _artNextAt = DateTime.Now;
@@ -836,6 +842,22 @@ public partial class FullscreenWindow : Window
         LightPlayPauseIcon.Animate = animate;
         DarkPlayPauseIcon.Playing = playing;
         LightPlayPauseIcon.Playing = playing;
+    }
+
+    void SyncFrameLoop()
+    {
+        var run = _isOpen && IsVisible && WindowState != WindowState.Minimized;
+        if (run == _frameHooked) return;
+        _frameHooked = run;
+        if (run)
+        {
+            _lastFrame = DateTime.Now;
+            CompositionTarget.Rendering += OnFrame;
+        }
+        else
+        {
+            CompositionTarget.Rendering -= OnFrame;
+        }
     }
 
     void OnFrame(object? sender, EventArgs e)

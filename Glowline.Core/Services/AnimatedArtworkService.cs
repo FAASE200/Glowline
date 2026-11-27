@@ -65,7 +65,7 @@ public sealed class AnimatedArtworkService
                 DurationSeconds = track.DurationSeconds,
                 SourceAppId = track.SourceAppId,
             };
-            Log.Write($"animated: álbum resuelto '{art.Album}' vía {art.Source}");
+            Log.Write($"animated: album resolved '{art.Album}' via {art.Source}");
         }
 
         var key = CacheKey(track);
@@ -128,7 +128,7 @@ public sealed class AnimatedArtworkService
 
             using var doc = await ExternalHttp.ReadJsonAsync(resp, ExternalHttp.MaxJsonBytes, ct);
             if (doc.RootElement.ValueKind != JsonValueKind.Object)
-                throw new ExternalDataException("m8tec devolvió un objeto inesperado.");
+                throw new ExternalDataException("m8tec returned an unexpected object.");
 
             var masterUrl = GetString(doc.RootElement, "url");
             if (masterUrl.Length == 0)
@@ -142,7 +142,7 @@ public sealed class AnimatedArtworkService
             var variant = PickAvcVariant(master, masterUri);
             if (variant is null || !MediaHosts.Allows(variant.Value.Uri))
             {
-                Log.Write("animated: m8tec sin variante AVC válida");
+                Log.Write("animated: m8tec has no valid AVC variant");
                 return new AnimatedCoverResult { ErrorKey = "AnimHevcOnly" };
             }
 
@@ -150,7 +150,7 @@ public sealed class AnimatedArtworkService
             var fileUri = FindMediaFile(media, variant.Value.Uri);
             if (fileUri is null || !MediaHosts.Allows(fileUri))
             {
-                Log.Write("animated: m8tec sin archivo de video válido");
+                Log.Write("animated: m8tec has no valid video file");
                 return new AnimatedCoverResult { ErrorKey = "AnimNoPlayableFile" };
             }
 
@@ -160,7 +160,7 @@ public sealed class AnimatedArtworkService
             if (bytes <= 0 || !LooksLikeMp4(temp))
             {
                 TryDelete(temp);
-                Log.Write("animated: archivo MP4 inválido");
+                Log.Write("animated: invalid MP4 file");
                 return new AnimatedCoverResult { ErrorKey = "AnimInvalid" };
             }
 
@@ -168,7 +168,7 @@ public sealed class AnimatedArtworkService
             File.Move(temp, path, true);
             Prune();
             Log.Write($"animated: '{track.DisplayName}' -> {variant.Value.Width}x{variant.Value.Height} " +
-                      $"({bytes} bytes{(rebased ? ", línea de tiempo ajustada" : "")})");
+                      $"({bytes} bytes{(rebased ? ", timeline adjusted" : "")})");
 
             return new AnimatedCoverResult
             {
@@ -199,7 +199,7 @@ public sealed class AnimatedArtworkService
         var text = await ExternalHttp.ReadStringAsync(resp, MaxPlaylistBytes, ct);
         if (!text.StartsWith("#EXTM3U", StringComparison.Ordinal) ||
             text.Count(ch => ch == '\n') > 20_000)
-            throw new ExternalDataException("Playlist HLS inválida.");
+            throw new ExternalDataException("Invalid HLS playlist.");
         return text;
     }
 
@@ -376,8 +376,8 @@ public sealed class AnimatedArtworkService
         try
         {
             File.WriteAllBytes(path, data);
-            Log.Write($"animated: fMP4 ajustado {first / (double)mediaTs:F2}s, " +
-                      $"duración {total / (double)mediaTs:F2}s");
+            Log.Write($"animated: fMP4 adjusted {first / (double)mediaTs:F2}s, " +
+                      $"duration {total / (double)mediaTs:F2}s");
             return true;
         }
         catch

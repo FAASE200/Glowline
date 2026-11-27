@@ -164,7 +164,7 @@ public sealed class UpdateService
             {
                 if (!ReleaseClient.IsSha256Digest(asset.Digest))
                 {
-                    Log.Write($"update: digest ausente o inválido en {release.Tag} ({asset.Digest ?? "null"})");
+                    Log.Write($"update: missing or invalid digest in {release.Tag} ({asset.Digest ?? "null"})");
                     SetState(UpdatePhase.Failed, "UpdateHashMismatch");
                     return;
                 }
@@ -192,7 +192,7 @@ public sealed class UpdateService
                 return;
             }
 
-            Log.Write($"update: {release.Tag} disponible ({info.Size / 1048576.0:0.0} MB)");
+            Log.Write($"update: {release.Tag} available ({info.Size / 1048576.0:0.0} MB)");
             await DownloadAsync(info, asset, ct);
         }
         catch (OperationCanceledException)
@@ -260,7 +260,7 @@ public sealed class UpdateService
                     new object?[] { Format(info.Version), info.Size / 1048576.0 * progress }, progress, info);
             }, ct);
             lock (_gate) _readyPath = final;
-            Log.Write($"update: lista {final}");
+            Log.Write($"update: ready {final}");
             SetState(UpdatePhase.Ready, "UpdateReadyFormat",
                 new object?[] { Format(info.Version) }, 1, info, final);
         }
@@ -303,7 +303,7 @@ public sealed class UpdateService
             if (restart) psi.ArgumentList.Add("--restart");
             Process.Start(psi);
             _applyStarted = true;
-            Log.Write($"update: aplicador iniciado restart={restart}");
+            Log.Write($"update: applier started restart={restart}");
             return true;
         }
         catch (Exception ex)
@@ -434,7 +434,7 @@ public sealed class UpdateService
 
         if (!copied)
         {
-            Log.Write("update apply: no se pudo preparar el nuevo ejecutable");
+            Log.Write("update apply: could not prepare the new executable");
             TryDelete(temp);
             return;
         }
@@ -442,11 +442,11 @@ public sealed class UpdateService
         if (!TrySwapToNewBinary(target, temp, backup))
         {
             TryDelete(temp);
-            Log.Write("update apply: no se pudo sustituir el ejecutable; se conserva el instalado");
+            Log.Write("update apply: could not replace the executable; keeping the installed one");
             return;
         }
 
-        Log.Write("update apply: ejecutable reemplazado");
+        Log.Write("update apply: executable replaced");
         if (restart) StartTarget(target);
     }
 

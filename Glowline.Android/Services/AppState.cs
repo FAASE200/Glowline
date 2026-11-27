@@ -113,7 +113,7 @@ public sealed class AppState
         {
             _artworkKey = key;
             var keepArt = CoverArtService.SameAlbum(Track.Album, _artAlbum) &&
-                          (_artSource != "Reproductor" || _artHighRes);
+                          (_artSource != "Player" || _artHighRes);
             if (!keepArt)
             {
                 _artAlbum = "";

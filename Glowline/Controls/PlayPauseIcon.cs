@@ -163,7 +163,7 @@ public sealed class PlayPauseIcon : Control
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
-        // El control dibuja con OnRender, así que el cambio de color debe invalidar.
+        // The control draws in OnRender, so a color change must invalidate it.
         if (e.Property == ForegroundProperty) InvalidateVisual();
     }
 }

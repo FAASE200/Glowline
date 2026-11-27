@@ -695,7 +695,7 @@ public partial class MainWindow : Window
     }
 
     static string CoverSourceLabel(string source) =>
-        source == "Reproductor" ? Loc.T("CoverSourcePlayer") : source;
+        source == "Player" ? Loc.T("CoverSourcePlayer") : source;
 
     void SetCoverStatus(string key, params object?[] args)
     {
@@ -829,7 +829,7 @@ public partial class MainWindow : Window
             if (track.Key != _artKey)
             {
                 var keepArt = CoverArtService.SameAlbum(track.Album, _artAlbum) &&
-                              (_artSource != "Reproductor" || _artHighRes);
+                              (_artSource != "Player" || _artHighRes);
                 _artKey = track.Key;
                 _artLoaded = keepArt;
                 _artNextAt = DateTime.Now;

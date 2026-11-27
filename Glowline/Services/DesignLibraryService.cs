@@ -10,8 +10,8 @@ using Glowline.Models;
 namespace Glowline.Services;
 
 /// <summary>
-/// Biblioteca local de diseños guardados como paquetes .glow en
-/// %LocalAppData%/Glowline/designs. Solo perfiles y previews: nunca assets remotos ni código.
+/// Local library of designs saved as .glow packages in
+/// %LocalAppData%/Glowline/designs. Profiles and previews only: never remote assets or code.
 /// </summary>
 public sealed class DesignLibraryService
 {
@@ -48,13 +48,13 @@ public sealed class DesignLibraryService
         try { files = Directory.GetFiles(LibraryDirectory, "*.glow"); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            throw new IOException($"No se pudo listar la biblioteca de diseños en '{LibraryDirectory}'.", ex);
+            throw new IOException($"Could not list the design library in '{LibraryDirectory}'.", ex);
         }
 
         foreach (var file in files.OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
         {
             ct.ThrowIfCancellationRequested();
-            // Un paquete corrupto no debe tumbar la lista completa: se omite.
+            // A corrupt package must not take down the whole list: it is skipped.
             try
             {
                 var pkg = await GlowPackageService.ImportAsync(file, ct).ConfigureAwait(false);
@@ -63,7 +63,7 @@ public sealed class DesignLibraryService
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) when (ex is InvalidDataException or JsonException or IOException or UnauthorizedAccessException)
             {
-                Log.Write($"[DesignLibrary] Se omite '{Path.GetFileName(file)}': {ex.Message}");
+                Log.Write($"[DesignLibrary] Skipping '{Path.GetFileName(file)}': {ex.Message}");
             }
         }
 
@@ -84,11 +84,11 @@ public sealed class DesignLibraryService
     static string SafeId(string id)
     {
         if (string.IsNullOrWhiteSpace(id))
-            throw new ArgumentException("El diseño debe tener un id.", nameof(id));
+            throw new ArgumentException("The design must have an id.", nameof(id));
         var trimmed = id.Trim();
-        // Rechaza ids con rutas o caracteres que puedan escapar de la carpeta de la biblioteca.
+        // Rejects ids with paths or characters that could escape the library folder.
         if (trimmed.Contains("..") || trimmed.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-            throw new ArgumentException($"Id de diseño no válido: '{trimmed}'.", nameof(id));
+            throw new ArgumentException($"Invalid design id: '{trimmed}'.", nameof(id));
         return trimmed;
     }
 }

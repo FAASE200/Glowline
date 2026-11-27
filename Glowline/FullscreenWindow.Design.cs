@@ -149,8 +149,8 @@ public partial class FullscreenWindow
         var coverSource = CoverA.Source as BitmapSource ?? CoverB.Source as BitmapSource;
         if (coverSource is not null)
         {
-            // El desenfoque se hornea en la miniatura 256x144: aplicarlo en vivo
-            // sobre la ventana completa cuesta GPU en cada fotograma sin verse mejor.
+            // The blur is baked into the 256x144 thumbnail: applying it live
+            // over the whole window costs GPU on every frame without looking better.
             var backdrop = CreateBackdrop(coverSource, blur);
             if (backdrop is not null)
             {
@@ -267,8 +267,8 @@ public partial class FullscreenWindow
 
     bool ResolveLayout(bool fixedBackground)
     {
-        // Adaptativo solo pasa a la vista vertical fusionada cuando la carátula
-        // tiene un fondo fijo de verdad; el resto usa la vista de dos columnas.
+        // Adaptive only switches to the merged vertical view when the cover
+        // really has a solid background; everything else uses the two-column view.
         return App.Designs.Active.Layout switch
         {
             DesignLayout.Adaptive => fixedBackground,
@@ -362,6 +362,7 @@ public partial class FullscreenWindow
     public void OpenForSnapshot()
     {
         _isOpen = true;
+        SyncFrameLoop();
         WindowState = WindowState.Normal;
         Left = -20000;
         Top = -20000;
@@ -382,6 +383,7 @@ public partial class FullscreenWindow
     public void CloseForSnapshot()
     {
         _isOpen = false;
+        SyncFrameLoop();
         _idleTimer.Stop();
         StopAnimated();
         Hide();
@@ -399,6 +401,7 @@ public partial class FullscreenWindow
     {
         if (!_isOpen) return;
         _isOpen = false;
+        SyncFrameLoop();
         _idleTimer.Stop();
         Cursor = Cursors.Arrow;
         _allowClose = true;
