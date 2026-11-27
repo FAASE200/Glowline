@@ -22,7 +22,7 @@ public sealed class DiscordPresence : IDisposable
     /// Id of the "Glowline" application in the Discord developer portal.
     /// It is not a secret. Empty = feature unavailable.
     /// </summary>
-    public const string ClientId = "";
+    public const string ClientId = "1575888637562982603";
 
     public static bool IsConfigured => ClientId.Length > 0;
 
