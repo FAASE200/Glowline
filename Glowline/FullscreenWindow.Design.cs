@@ -362,6 +362,7 @@ public partial class FullscreenWindow
     public void OpenForSnapshot()
     {
         _isOpen = true;
+        SyncFrameLoop();
         WindowState = WindowState.Normal;
         Left = -20000;
         Top = -20000;
@@ -382,6 +383,7 @@ public partial class FullscreenWindow
     public void CloseForSnapshot()
     {
         _isOpen = false;
+        SyncFrameLoop();
         _idleTimer.Stop();
         StopAnimated();
         Hide();
@@ -399,6 +401,7 @@ public partial class FullscreenWindow
     {
         if (!_isOpen) return;
         _isOpen = false;
+        SyncFrameLoop();
         _idleTimer.Stop();
         Cursor = Cursors.Arrow;
         _allowClose = true;

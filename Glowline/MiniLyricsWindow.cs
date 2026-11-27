@@ -28,6 +28,9 @@ public sealed class MiniLyricsWindow : Window
     readonly TextBlock _title;
     readonly Border _panel;
     readonly Button _close;
+    static readonly TimeSpan VisibleInterval = TimeSpan.FromMilliseconds(60);
+    static readonly TimeSpan HiddenInterval = TimeSpan.FromMilliseconds(500);
+
     readonly DispatcherTimer _timer;
     int _lineIndex = int.MinValue;
     LyricsState _state = LyricsState.Idle;
@@ -160,12 +163,14 @@ public sealed class MiniLyricsWindow : Window
             e.Handled = true;
         };
 
+        // Created before any handler that uses it, so the field is never read unassigned.
+        _timer = new DispatcherTimer(DispatcherPriority.Render) { Interval = VisibleInterval };
+        _timer.Tick += (_, __) => Refresh();
+
         SourceInitialized += (_, __) => MakeToolWindow();
         Loaded += (_, __) => PlaceWindow();
         Closed += (_, __) => _timer.Stop();
 
-        _timer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(60) };
-        _timer.Tick += (_, __) => Refresh();
         _timer.Start();
         Refresh();
     }
@@ -179,7 +184,16 @@ public sealed class MiniLyricsWindow : Window
         var hidden = App.Primary?.IsShowingFullscreen == true || track is null;
         var visibility = hidden ? Visibility.Hidden : Visibility.Visible;
         if (Visibility != visibility) Visibility = visibility;
-        if (track is null) return;
+
+        // While hidden it only has to notice when to come back, so it checks
+        // less often and skips the lyrics work.
+        var interval = hidden ? HiddenInterval : VisibleInterval;
+        if (_timer.Interval != interval) _timer.Interval = interval;
+        if (hidden || track is null)
+        {
+            _lineIndex = int.MinValue;
+            return;
+        }
 
         var key = track.Key;
         if (key != _trackKey || !ReferenceEquals(_lines, lyrics.Lines) || _state != lyrics.State)
