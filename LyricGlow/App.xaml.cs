@@ -35,6 +35,8 @@ public partial class App : Application
     public static SoundSenseService? SoundSense { get; private set; }
     public static MainWindow? MainWindowRef { get; private set; }
     public static FullscreenWindow? Primary { get; private set; }
+    public static GlobalHotkeyService? Hotkeys { get; private set; }
+    public static NowPlayingHub? NowPlaying { get; private set; }
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -239,6 +241,42 @@ public partial class App : Application
         Primary.OpenPrimary();
         _ = InitMediaAsync();
         Updates.StartAutoChecks();
+        StartExtras();
+    }
+
+    // Funciones de la 0.9.40: atajos globales, mini-letra, OBS y Discord.
+    // Cada una falla por su cuenta sin afectar al resto de la app.
+    void StartExtras()
+    {
+        try
+        {
+            Hotkeys = new GlobalHotkeyService();
+            Hotkeys.Apply(Settings.Settings.GlobalHotkeysEnabled);
+        }
+        catch (Exception ex)
+        {
+            Log.Write("hotkeys: " + ex.Message);
+        }
+
+        try
+        {
+            NowPlaying = new NowPlayingHub();
+            NowPlaying.Apply(Settings.Settings);
+        }
+        catch (Exception ex)
+        {
+            Log.Write("integrations: " + ex.Message);
+        }
+
+        try
+        {
+            MiniLyricsWindow.Sync();
+        }
+        catch (Exception ex)
+        {
+            Log.Write("mini lyrics: " + ex.Message);
+        }
+        MainWindowRef?.RefreshExtrasUi();
     }
 
     public static void ShowPrimaryWindow()
@@ -853,6 +891,8 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         try { Updates?.ApplyPendingOnExit(restart: false); } catch { }
+        try { Hotkeys?.Dispose(); } catch { }
+        try { NowPlaying?.Dispose(); } catch { }
         SoundSense?.Dispose();
         Media?.Dispose();
         if (Designs is not null)

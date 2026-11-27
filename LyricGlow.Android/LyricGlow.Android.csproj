@@ -36,8 +36,8 @@
 		<ApplicationId>com.faase200.lyricglow</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>0.9.30</ApplicationDisplayVersion>
-		<ApplicationVersion>9030</ApplicationVersion>
+		<ApplicationDisplayVersion>0.9.40</ApplicationDisplayVersion>
+		<ApplicationVersion>9040</ApplicationVersion>
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>None</WindowsPackageType>

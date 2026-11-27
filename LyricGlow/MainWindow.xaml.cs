@@ -598,6 +598,7 @@ public partial class MainWindow : Window
         SoundSenseCheck.IsChecked = s.SoundSenseEnabled;
         SoundSenseIntensitySlider.Value = Math.Clamp(s.SoundSenseIntensity * 100, 0, 100);
         SoundSenseIntensityText.Text = $"{(int)SoundSenseIntensitySlider.Value}%";
+        RefreshExtrasUi();
         AnimatedCoverCheck.IsChecked = s.AnimatedCoversEnabled;
         SetAnimStatus(s.AnimatedCoversEnabled ? "NoPlayback" : "CoverDisabled");
         SetCoverStatus("CoverStaticDash");
@@ -1253,6 +1254,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        RefreshExtrasUi();
         _trayOpenItem.Text = Loc.T("TrayOpen");
         _traySettingsItem.Text = Loc.T("TraySettings");
         _trayModeItem.Text = Loc.T("TrayToggleMode");
@@ -1541,6 +1543,19 @@ public partial class MainWindow : Window
             _tray.ShowBalloonTip(3500, "Glowline",
                 Loc.F("UpdateReadyBalloon", state.Info?.Version.ToString(3) ?? ""),
                 WinForms.ToolTipIcon.None);
+        }
+    }
+
+    /// <summary>Muestra un aviso de Windows desde el ícono de la bandeja.</summary>
+    public void ShowNotice(string text)
+    {
+        try
+        {
+            _tray.ShowBalloonTip(3500, "Glowline", text, WinForms.ToolTipIcon.None);
+        }
+        catch (Exception ex)
+        {
+            Log.Write("notice: " + ex.Message);
         }
     }
 

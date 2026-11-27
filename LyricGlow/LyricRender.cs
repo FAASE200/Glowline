@@ -15,6 +15,26 @@ public static class LyricRender
         if (line.Text.Length > 0)
             block.Inlines.Add(new Run(line.Text));
         AppendBackground(block, line, background);
+        AppendRomanized(block, line, background);
+    }
+
+    /// <summary>
+    /// Agrega debajo de la línea su pronunciación en letras latinas
+    /// (romanización local), en cursiva y más pequeña.
+    /// </summary>
+    public static void AppendRomanized(TextBlock block, LrcLine line, Color color, double scale = 0.5)
+    {
+        if (line.Romanized.Length == 0) return;
+        if (block.Inlines.Count > 0)
+            block.Inlines.Add(new LineBreak());
+
+        block.Inlines.Add(new Run(line.Romanized)
+        {
+            FontSize = Math.Max(10, block.FontSize * scale),
+            FontWeight = FontWeights.Normal,
+            FontStyle = FontStyles.Italic,
+            Foreground = new SolidColorBrush(color),
+        });
     }
 
     public static void AppendBackground(TextBlock block, LrcLine line, Color color, double scale = 0.56)

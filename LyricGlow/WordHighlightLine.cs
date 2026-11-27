@@ -119,6 +119,8 @@ public sealed class WordHighlightLine
 
         if (line is not null && line.Background.Length > 0)
             AppendBackground(line);
+        if (line is not null)
+            LyricRender.AppendRomanized(_target, line, BackgroundColor);
     }
 
     void AppendBackground(LrcLine line)

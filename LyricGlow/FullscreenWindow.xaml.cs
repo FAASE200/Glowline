@@ -2661,6 +2661,11 @@ public partial class FullscreenWindow : Window
                 _ = SeekToLineAsync(lineIndex);
                 e.Handled = true;
             };
+            block.MouseRightButtonUp += (_, e) =>
+            {
+                ShowLineMenu(block, lineIndex);
+                e.Handled = true;
+            };
             block.MouseEnter += (_, __) => _hoverLine = lineIndex;
             block.MouseLeave += (_, __) =>
             {

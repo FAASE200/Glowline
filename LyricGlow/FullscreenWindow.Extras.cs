@@ -1,0 +1,96 @@
+using System;
+using System.Diagnostics;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using LyricGlow.Localization;
+using LyricGlow.Models;
+using LyricGlow.Services;
+
+namespace LyricGlow;
+
+// Funciones de la 0.9.40: menú de cada línea (compartir como imagen y ajuste
+// fino de sincronía).
+public partial class FullscreenWindow
+{
+    const int LineNudgeMs = 100;
+
+    /// <summary>True mientras la vista de letras ocupa la pantalla completa y está al frente.</summary>
+    public bool IsShowingFullscreen =>
+        _isOpen && IsVisible && IsActive && !_windowed && WindowState != WindowState.Minimized;
+
+    void ShowLineMenu(FrameworkElement target, int index)
+    {
+        if (index < 0 || index >= _lines.Count) return;
+        var offset = _lyrics.GetLineOffsetMs(index);
+        var menu = new ContextMenu { PlacementTarget = target };
+
+        var share = new MenuItem { Header = Loc.T("LineMenuShare") };
+        share.Click += (_, __) => ShareLine(index);
+        menu.Items.Add(share);
+        menu.Items.Add(new Separator());
+
+        var header = new MenuItem
+        {
+            Header = offset == 0
+                ? Loc.T("LineMenuTiming")
+                : Loc.F("LineMenuTimingFormat", FormatOffset(offset)),
+            IsEnabled = false,
+        };
+        menu.Items.Add(header);
+
+        var earlier = new MenuItem { Header = Loc.F("LineMenuEarlierFormat", LineNudgeMs) };
+        earlier.Click += (_, __) => _lyrics.AdjustLineOffset(index, -LineNudgeMs);
+        menu.Items.Add(earlier);
+
+        var later = new MenuItem { Header = Loc.F("LineMenuLaterFormat", LineNudgeMs) };
+        later.Click += (_, __) => _lyrics.AdjustLineOffset(index, LineNudgeMs);
+        menu.Items.Add(later);
+
+        var reset = new MenuItem { Header = Loc.T("LineMenuReset"), IsEnabled = offset != 0 };
+        reset.Click += (_, __) => _lyrics.ResetLineOffset(index);
+        menu.Items.Add(reset);
+
+        menu.IsOpen = true;
+    }
+
+    static string FormatOffset(int ms) =>
+        (ms > 0 ? "+" : "−") + (Math.Abs(ms) / 1000.0).ToString("0.0#", System.Globalization.CultureInfo.CurrentCulture) + " s";
+
+    /// <summary>Comparte la línea indicada, o la actual si es -1.</summary>
+    public void ShareLine(int index = -1)
+    {
+        if (index < 0) index = _currentLine;
+        var track = _lyrics.Track;
+        if (track is null || index < 0 || index >= _lines.Count)
+        {
+            App.MainWindowRef?.ShowNotice(Loc.T("ShareNothing"));
+            return;
+        }
+
+        try
+        {
+            var accent = _fusionBackground == Colors.White ? Color.FromRgb(0xFF, 0x3B, 0x30) : _fusionBackground;
+            var path = ShareCardService.CreateAndSave(_lines[index], track, _artBytes, accent);
+            App.MainWindowRef?.ShowNotice(Loc.F("ShareSavedFormat", path));
+        }
+        catch (Exception ex)
+        {
+            Log.Write("share: " + ex);
+            App.MainWindowRef?.ShowNotice(Loc.T("ShareFailed"));
+        }
+    }
+
+    public static void OpenShareFolder()
+    {
+        try
+        {
+            System.IO.Directory.CreateDirectory(ShareCardService.OutputDirectory);
+            Process.Start(new ProcessStartInfo(ShareCardService.OutputDirectory) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Log.Write("share folder: " + ex.Message);
+        }
+    }
+}
