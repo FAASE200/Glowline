@@ -1,14 +1,19 @@
 name: Release
 
-# Pushing a release/<version> branch builds the Windows installer and the
-# portable app and creates a DRAFT GitHub release v<version> with the notes
-# from docs/release-notes/<version>.md. GitHub creates the tag when the draft
-# is published, which is a manual step: the in-app updater only offers a build
-# after someone has checked it.
+# When main gets a new version (LyricGlow.csproj) or its release notes
+# (docs/release-notes/<version>.md), this builds the Windows installer and the
+# portable app and creates a DRAFT GitHub release v<version>. GitHub creates
+# the tag when the draft is published, which is a manual step: the in-app
+# updater only offers a build after someone has checked it.
+# Versions that are already published are skipped.
 
 on:
   push:
-    branches: ['release/**']
+    branches: [main]
+    paths:
+      - LyricGlow/LyricGlow.csproj
+      - docs/release-notes/**
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -34,21 +39,34 @@ jobs:
       - name: Read version
         id: version
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           [xml]$project = Get-Content LyricGlow/LyricGlow.csproj
           $version = [string]@($project.Project.PropertyGroup.Version)[0]
-          $branch = "${{ github.ref_name }}"
-          if ($branch -ne "release/$version") { throw "Branch $branch does not match project version $version" }
           "TAG=v$version" >> $env:GITHUB_ENV
-          $notes = "docs/release-notes/$version.md"
-          if (-not (Test-Path $notes)) { throw "Missing $notes" }
           "version=$version" >> $env:GITHUB_OUTPUT
+          $notes = "docs/release-notes/$version.md"
           "notes=$notes" >> $env:GITHUB_OUTPUT
 
+          # A published release is never rebuilt; a missing notes file means
+          # the version isn't ready to be released yet.
+          $published = $false
+          $existing = gh release view "v$version" --json isDraft 2>$null | ConvertFrom-Json
+          if ($existing -and -not $existing.isDraft) { $published = $true }
+          $ready = (Test-Path $notes) -and -not $published
+          if (-not (Test-Path $notes)) { Write-Host "No $notes yet: skipping release." }
+          if ($published) { Write-Host "v$version is already published: skipping release." }
+          "ready=$ready".ToLowerInvariant() >> $env:GITHUB_OUTPUT
+          # "gh release view" fails when the release doesn't exist yet; that's expected.
+          $global:LASTEXITCODE = 0
+
       - name: Test LyricGlow.Core
+        if: steps.version.outputs.ready == 'true'
         run: dotnet run --project LyricGlow.Core.Tests/LyricGlow.Core.Tests.csproj -c Release
 
       - name: Publish the Windows app
+        if: steps.version.outputs.ready == 'true'
         run: >
           dotnet publish LyricGlow/LyricGlow.csproj -c Release -r win-x64
           --self-contained true -p:PublishSingleFile=true
@@ -56,15 +74,18 @@ jobs:
           -p:IncludeNativeLibrariesForSelfExtract=true -o LyricGlow/publish
 
       - name: Install WiX 5
+        if: steps.version.outputs.ready == 'true'
         run: |
           dotnet tool install --global wix --version 5.0.2
           wix extension add -g WixToolset.BootstrapperApplications.wixext/5.0.2
 
       - name: Build installers
+        if: steps.version.outputs.ready == 'true'
         shell: pwsh
         run: ./LyricGlow/tools/build-installers.ps1 -Version ${{ steps.version.outputs.version }} -PublishDir "$PWD/LyricGlow/publish"
 
       - name: Collect release assets
+        if: steps.version.outputs.ready == 'true'
         id: assets
         shell: pwsh
         run: |
@@ -78,6 +99,7 @@ jobs:
           } | Tee-Object -FilePath hashes.txt
 
       - name: Create draft release
+        if: steps.version.outputs.ready == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -93,7 +115,6 @@ jobs:
           # touches a release that has already been published.
           $existing = gh release view $env:TAG --json isDraft 2>$null | ConvertFrom-Json
           if ($existing) {
-            if (-not $existing.isDraft) { throw "$env:TAG is already published; bump the version instead." }
             gh release delete $env:TAG --yes
           }
 
