@@ -384,7 +384,7 @@ public partial class App : Application
             player.Play();
             if (await Task.WhenAny(opened.Task, Task.Delay(5000)) != opened.Task || !opened.Task.Result)
             {
-                Console.WriteLine("animframe: no se pudo abrir");
+                Console.WriteLine("animframe: could not open");
                 player.Close();
                 IsExiting = true;
                 Shutdown(2);
@@ -427,7 +427,7 @@ public partial class App : Application
                 }
             }
             var center = (h / 2) * stride + (w / 2) * 4;
-            Console.WriteLine($"animframe: {w}x{h} borde=({rr / n},{gg / n},{bb / n}) " +
+            Console.WriteLine($"animframe: {w}x{h} border=({rr / n},{gg / n},{bb / n}) " +
                               $"centro=({buffer[center + 2]},{buffer[center + 1]},{buffer[center]}) -> {outPath}");
             player.Close();
         }

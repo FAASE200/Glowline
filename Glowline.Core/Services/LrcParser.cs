@@ -82,7 +82,7 @@ public static class LrcParser
                     totalWords += parsedWords.Count;
                     if (totalWords > ExternalHttp.MaxLyricWords)
                     {
-                        Log.Write("lrc: demasiadas palabras");
+                        Log.Write("lrc: too many words");
                         return new List<LrcLine>();
                     }
                     if (parsedWords.Count > 0) words = parsedWords;

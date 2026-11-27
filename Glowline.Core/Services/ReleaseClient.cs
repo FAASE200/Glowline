@@ -103,7 +103,7 @@ public sealed class ReleaseClient
         using var doc = await ExternalHttp.ReadJsonAsync(response, MaxApiJsonBytes, ct);
         var root = doc.RootElement;
         if (root.ValueKind != JsonValueKind.Object)
-            throw new InvalidDataException("Respuesta de GitHub inesperada.");
+            throw new InvalidDataException("Unexpected response from GitHub.");
 
         var tag = ExternalHttp.CleanText(GetString(root, "tag_name"), MaxTagChars);
         var version = ParseVersion(tag);
@@ -114,7 +114,7 @@ public sealed class ReleaseClient
             var count = 0;
             foreach (var item in nodes.EnumerateArray())
             {
-                if (++count > MaxAssets) throw new InvalidDataException("Demasiados assets en la release.");
+                if (++count > MaxAssets) throw new InvalidDataException("Too many assets in the release.");
                 if (item.ValueKind != JsonValueKind.Object) continue;
                 var name = ExternalHttp.CleanText(GetString(item, "name"), MaxNameChars);
                 if (name.Length == 0) continue;
@@ -166,7 +166,7 @@ public sealed class ReleaseClient
         if (root.TryGetProperty("assets", out var nodes) && nodes.ValueKind == JsonValueKind.Array)
         {
             if (nodes.GetArrayLength() > MaxAssets)
-                throw new InvalidDataException("Demasiados assets en el manifest.");
+                throw new InvalidDataException("Too many assets in the manifest.");
             foreach (var item in nodes.EnumerateArray())
             {
                 if (item.ValueKind != JsonValueKind.Object) continue;

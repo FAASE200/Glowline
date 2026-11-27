@@ -63,7 +63,7 @@ public sealed class DesignLibraryService
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) when (ex is InvalidDataException or JsonException or IOException or UnauthorizedAccessException)
             {
-                Log.Write($"[DesignLibrary] Se omite '{Path.GetFileName(file)}': {ex.Message}");
+                Log.Write($"[DesignLibrary] Skipping '{Path.GetFileName(file)}': {ex.Message}");
             }
         }
 

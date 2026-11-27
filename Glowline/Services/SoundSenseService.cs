@@ -190,7 +190,7 @@ public sealed class SoundSenseService : IDisposable
                 capture.StartRecording();
                 _deviceErrorKey = null;
                 ResetAnalyzerLocked();
-                Log.Write($"SoundSense: captura iniciada ({_sampleRate} Hz, {_channels} ch, {format.BitsPerSample} bits)");
+                Log.Write($"SoundSense: capture started ({_sampleRate} Hz, {_channels} ch, {format.BitsPerSample} bits)");
             }
             catch (Exception ex)
             {

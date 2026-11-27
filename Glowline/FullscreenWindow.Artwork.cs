@@ -159,11 +159,11 @@ public partial class FullscreenWindow
             if (cts.IsCancellationRequested || _animTrackKey != key || !_isOpen) return;
             if (!result.Available || result.Path is null)
             {
-                Log.Write("animated UI: no disponible (" + (result.ErrorKey ?? "none") + ")");
+                Log.Write("animated UI: unavailable (" + (result.ErrorKey ?? "none") + ")");
                 StopAnimated();
                 return;
             }
-            Log.Write($"animated UI: iniciando {result.Source} {result.Path}");
+            Log.Write($"animated UI: starting {result.Source} {result.Path}");
             StartAnimated(result.Path);
         }
         catch (OperationCanceledException)
@@ -179,7 +179,7 @@ public partial class FullscreenWindow
     void StartAnimated(string path)
     {
         if (!_isOpen || !_settings.Settings.AnimatedCoversEnabled) return;
-        Log.Write("animated UI: cargando MediaElement");
+        Log.Write("animated UI: loading MediaElement");
         var uri = new Uri(path);
         _animatedPlaying = false;
 
@@ -267,7 +267,7 @@ public partial class FullscreenWindow
         if (sender is not MediaElement element || !ReferenceEquals(element, ActiveAnimated))
             return;
         if (!_animatedReady) return;
-        Log.Write("animated UI: fin, reiniciando");
+        Log.Write("animated UI: ended, restarting");
         element.Position = TimeSpan.Zero;
         element.Play();
         _animatedPlaying = true;

@@ -114,7 +114,7 @@ public static class ExternalHttp
 
             current = location.IsAbsoluteUri ? location : new Uri(current, location);
         }
-        throw new ExternalDataException("Demasiadas redirecciones externas.");
+        throw new ExternalDataException("Too many external redirects.");
     }
 
     static bool IsRedirect(HttpStatusCode code) =>
@@ -154,7 +154,7 @@ public static class ExternalHttp
     {
         var declared = response.Content.Headers.ContentLength;
         if (declared is not null && declared > maxBytes)
-            throw new ExternalDataException("Respuesta externa demasiado grande.");
+            throw new ExternalDataException("External response too large.");
 
         await using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
         var capacity = declared is > 0 and < 16L * 1024 * 1024 ? (int)declared.Value : 81920;
@@ -166,7 +166,7 @@ public static class ExternalHttp
         {
             total += read;
             if (total > maxBytes)
-                throw new ExternalDataException("Respuesta externa demasiado grande.");
+                throw new ExternalDataException("External response too large.");
             buffer.Write(chunk, 0, read);
         }
         return buffer.ToArray();

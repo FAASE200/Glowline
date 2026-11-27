@@ -452,7 +452,7 @@ public sealed class CoverArtService
             if (resp.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.Forbidden)
             {
                 _itunesCooldownUntil = DateTime.UtcNow.AddMinutes(2);
-                Log.Write($"cover: iTunes limit {(int)resp.StatusCode}; usando Deezer");
+                Log.Write($"cover: iTunes limit {(int)resp.StatusCode}; using Deezer");
                 return new CoverArtResult();
             }
             if (!resp.IsSuccessStatusCode)
@@ -961,7 +961,7 @@ public sealed class CoverArtService
         var (width, height) = ImageSize(bytes);
         if (!IsAcceptableImageSize(width, height))
         {
-            Log.Write($"cover: imagen rechazada {width}x{height}");
+            Log.Write($"cover: image rejected {width}x{height}");
             return new CoverArtResult();
         }
         return new CoverArtResult
