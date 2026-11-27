@@ -48,4 +48,4 @@ body:
     id: log
     attributes:
       label: Log
-      description: Drag and drop `%LOCALAPPDATA%\LyricGlow\log.txt` here (and `log.old.txt` if it exists).
+      description: Drag and drop `%LOCALAPPDATA%\Glowline\log.txt` here (and `log.old.txt` if it exists).

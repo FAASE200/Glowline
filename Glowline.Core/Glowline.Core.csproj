@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Company>fSS</Company>
+    <Copyright>Copyright (c) 2026 fSS</Copyright>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Glowline" />
+    <InternalsVisibleTo Include="Glowline.Android" />
+    <InternalsVisibleTo Include="Glowline.Core.Tests" />
+  </ItemGroup>
+
+</Project>

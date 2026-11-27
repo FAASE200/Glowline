@@ -1,0 +1,43 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
+  <Bundle Name="Glowline"
+          Manufacturer="fSS"
+          Version="$(var.Version)"
+          UpgradeCode="C67B9EFA-A31E-40D9-B80E-AFA820A93819"
+          IconSourceFile="$(var.ProjectDir)\app.ico">
+    <BootstrapperApplication>
+      <Payload SourceFile="$(var.ProjectDir)\installer\cobalt-background.png" />
+      <Payload SourceFile="$(var.ProjectDir)\installer\cobalt-logo.png" />
+      <Payload SourceFile="$(var.ProjectDir)\installer\cobalt-progress.png" />
+      <bal:WixStandardBootstrapperApplication Theme="hyperlinkLicense"
+                                               ThemeFile="$(var.ProjectDir)\installer\CobaltTheme.xml"
+                                               LicenseUrl=""
+                                               LaunchTarget="[DesktopFolder]Glowline.lnk"
+                                               LaunchWorkingFolder="[DesktopFolder]"
+                                               ShowVersion="yes" />
+    </BootstrapperApplication>
+
+    <Variable Name="InstallForAllUsers" Type="numeric" Value="0" />
+    <Variable Name="InstallFolderUser" Type="string" Value="[LocalAppDataFolder]Programs\Glowline" />
+    <Variable Name="InstallFolderMachine" Type="string" Value="[ProgramFilesFolder]Glowline" />
+
+    <SetVariable Variable="InstallFolderUser" Type="string" Value="[LocalAppDataFolder]Programs\Glowline" />
+    <SetVariable Variable="InstallFolderMachine" Type="string" Value="[ProgramFilesFolder]Glowline" />
+
+    <Chain>
+      <MsiPackage Id="GlowlinePerUser"
+                  SourceFile="$(var.MsiPath)"
+                  InstallCondition="InstallForAllUsers = 0"
+                  Vital="yes">
+        <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolderUser]" />
+      </MsiPackage>
+
+      <MsiPackage Id="GlowlinePerMachine"
+                  SourceFile="$(var.AllUsersMsiPath)"
+                  InstallCondition="InstallForAllUsers &gt; 0"
+                  Vital="yes">
+        <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolderMachine]" />
+      </MsiPackage>
+    </Chain>
+  </Bundle>
+</Wix>

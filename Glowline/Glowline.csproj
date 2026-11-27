@@ -1,0 +1,49 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>Glowline</AssemblyName>
+    <RootNamespace>Glowline</RootNamespace>
+    <Product>Glowline</Product>
+    <AssemblyTitle>Glowline</AssemblyTitle>
+    <Company>fSS</Company>
+    <Copyright>Copyright (c) 2026 fSS</Copyright>
+    <Description>Synced music lyrics for everyone.</Description>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <Version>0.9.40</Version>
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="app.ico" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <ProjectReference Include="..\Glowline.Core\Glowline.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Localization\Strings-es.json" />
+    <EmbeddedResource Include="Localization\Strings-en.json" />
+    <EmbeddedResource Include="Localization\Strings-pt-BR.json" />
+    <EmbeddedResource Include="Localization\Strings-fr.json" />
+    <EmbeddedResource Include="Localization\Strings-de.json" />
+    <EmbeddedResource Include="Localization\Strings-it.json" />
+    <EmbeddedResource Include="Localization\Strings-ja.json" />
+    <EmbeddedResource Include="Localization\Strings-ko.json" />
+    <EmbeddedResource Include="Localization\Strings-zh-CN.json" />
+    <EmbeddedResource Include="Localization\Strings-ru.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="scratch/**/*.cs" />
+  </ItemGroup>
+
+</Project>
+
