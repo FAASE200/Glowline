@@ -24,7 +24,7 @@ public sealed class LrcLibClient
     };
 
     static HttpClient CreateClient() =>
-        ExternalHttp.CreateClient(TimeSpan.FromSeconds(15), "LyricGlow/0.9 (synchronized lyrics)",
+        ExternalHttp.CreateClient(TimeSpan.FromSeconds(15), AppInfo.UserAgent,
             "application/json");
 
     public async Task<LrclibTrack?> GetExactAsync(string title, string artist, string? album, double? durationSeconds, CancellationToken ct)

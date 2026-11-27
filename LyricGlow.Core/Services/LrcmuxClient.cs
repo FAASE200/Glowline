@@ -32,7 +32,7 @@ public sealed class LrcmuxClient
     };
 
     static HttpClient CreateClient() =>
-        ExternalHttp.CreateClient(TimeSpan.FromSeconds(20), "LyricGlow/0.9 (synchronized lyrics)",
+        ExternalHttp.CreateClient(TimeSpan.FromSeconds(20), AppInfo.UserAgent,
             "application/json");
 
     public async Task<LrclibTrack?> GetAsync(

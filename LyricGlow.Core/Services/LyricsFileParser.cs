@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 using LyricGlow.Models;
 
 namespace LyricGlow.Services;
@@ -138,7 +139,62 @@ public static class LyricsFileParser
         if (value.Length >= 2 && value[0] == '\'' && value[^1] == '\'')
             return value[1..^1].Replace("''", "'");
         if (value.Length >= 2 && value[0] == '"' && value[^1] == '"')
-            return value[1..^1].Replace("\\\"", "\"");
+            return UnescapeDoubleQuoted(value[1..^1]);
         return value;
+    }
+
+    // YAML permite secuencias de escape en cadenas con comillas dobles
+    // (\u00e9, \n, \\...). Antes solo se resolvía \" y las tildes o emojis
+    // escapados aparecían tal cual en pantalla.
+    internal static string UnescapeDoubleQuoted(string text)
+    {
+        if (text.IndexOf('\\') < 0) return text;
+        var sb = new StringBuilder(text.Length);
+        for (var i = 0; i < text.Length; i++)
+        {
+            var ch = text[i];
+            if (ch != '\\' || i + 1 >= text.Length)
+            {
+                sb.Append(ch);
+                continue;
+            }
+
+            var next = text[++i];
+            switch (next)
+            {
+                case '"': sb.Append('"'); break;
+                case '\\': sb.Append('\\'); break;
+                case '/': sb.Append('/'); break;
+                case 'n': sb.Append('\n'); break;
+                case 't': sb.Append('\t'); break;
+                case 'r': sb.Append('\r'); break;
+                case '0': sb.Append('\0'); break;
+                case ' ': sb.Append(' '); break;
+                case '_': sb.Append('\u00A0'); break;
+                case 'x' when TryHex(text, i + 1, 2, out var x):
+                    sb.Append((char)x);
+                    i += 2;
+                    break;
+                case 'u' when TryHex(text, i + 1, 4, out var u):
+                    sb.Append((char)u);
+                    i += 4;
+                    break;
+                case 'U' when TryHex(text, i + 1, 8, out var big) && big <= 0x10FFFF:
+                    sb.Append(char.ConvertFromUtf32(big));
+                    i += 8;
+                    break;
+                default:
+                    sb.Append('\\').Append(next);
+                    break;
+            }
+        }
+        return sb.ToString();
+    }
+
+    static bool TryHex(string text, int start, int length, out int value)
+    {
+        value = 0;
+        if (start + length > text.Length) return false;
+        return int.TryParse(text.AsSpan(start, length), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out value);
     }
 }

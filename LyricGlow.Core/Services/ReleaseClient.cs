@@ -53,7 +53,7 @@ public sealed class ReleaseClient
 
     static HttpClient BuildClient(TimeSpan timeout, bool json)
     {
-        var client = ExternalHttp.CreateClient(timeout, "Glowline-Updater/2.0");
+        var client = ExternalHttp.CreateClient(timeout, AppInfo.UserAgent + " updater");
         if (json)
         {
             client.DefaultRequestHeaders.Accept.Add(
@@ -231,29 +231,39 @@ public sealed class ReleaseClient
         double reported = 0;
         long readTotal = 0;
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        await using (var input = await response.Content.ReadAsStreamAsync(ct))
-        await using (var output = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+        try
         {
-            var buffer = new byte[81920];
-            int read;
-            while ((read = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
+            await using (var input = await response.Content.ReadAsStreamAsync(ct))
+            await using (var output = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
             {
-                readTotal += read;
-                if (readTotal > MaxDownloadBytes)
+                var buffer = new byte[81920];
+                int read;
+                while ((read = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
                 {
-                    output.Close();
-                    try { File.Delete(part); } catch { }
-                    throw new InvalidDataException("El instalador excede el tamaño permitido.");
-                }
-                await output.WriteAsync(buffer.AsMemory(0, read), ct);
-                hash.AppendData(buffer, 0, read);
-                var value = total > 0 ? Math.Clamp((double)readTotal / total, 0, 1) : 0;
-                if (value - reported >= 0.02 || value >= 1)
-                {
-                    reported = value;
-                    progress?.Invoke(value);
+                    readTotal += read;
+                    if (readTotal > MaxDownloadBytes)
+                    {
+                        output.Close();
+                        try { File.Delete(part); } catch { }
+                        throw new InvalidDataException("El instalador excede el tamaño permitido.");
+                    }
+                    await output.WriteAsync(buffer.AsMemory(0, read), ct);
+                    hash.AppendData(buffer, 0, read);
+                    var value = total > 0 ? Math.Clamp((double)readTotal / total, 0, 1) : 0;
+                    if (value - reported >= 0.02 || value >= 1)
+                    {
+                        reported = value;
+                        progress?.Invoke(value);
+                    }
                 }
             }
+        }
+        catch
+        {
+            // Una descarga cortada o cancelada no debe dejar un .part huérfano
+            // de decenas de MB en la carpeta de actualizaciones.
+            try { File.Delete(part); } catch { }
+            throw;
         }
         if (asset.Size > 0 && readTotal != asset.Size)
         {

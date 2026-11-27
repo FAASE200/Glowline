@@ -14,13 +14,19 @@ public sealed class TrackInfo
     public double? DurationSeconds { get; init; }
     public string SourceAppId { get; init; } = "";
 
-    public string Key => TrackKey.Make(Artist, Title, DurationSeconds);
+    string? _key;
+
+    // Se calcula una sola vez: la vista a pantalla completa la consulta en
+    // cada frame (offset por canción) y normalizar con regex tiene coste.
+    public string Key => _key ??= TrackKey.Make(Artist, Title, DurationSeconds);
 
     public string DisplayName => Artist.Length > 0 ? $"{Artist} — {Title}" : Title;
 }
 
 public static class TrackKey
 {
+    static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
+
     public static string Make(string artist, string title, double? durationSeconds)
     {
         var d = durationSeconds is > 0 and < 86400
@@ -33,7 +39,7 @@ public static class TrackKey
     {
         var text = s ?? "";
         if (text.Length > 1024) text = text[..1024];
-        return Regex.Replace(text.Trim().ToLowerInvariant(), @"\s+", " ");
+        return Whitespace.Replace(text.Trim().ToLowerInvariant(), " ");
     }
 }
 

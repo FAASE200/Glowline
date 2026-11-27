@@ -10,6 +10,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="LyricGlow" />
     <InternalsVisibleTo Include="LyricGlow.Android" />
+    <InternalsVisibleTo Include="LyricGlow.Core.Tests" />
   </ItemGroup>
 
 </Project>

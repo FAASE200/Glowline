@@ -75,6 +75,7 @@ public sealed class UpdateService
         {
             try
             {
+                CleanupOldDownloads();
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 while (true)
                 {
@@ -88,6 +89,43 @@ public sealed class UpdateService
                 Log.Write("update auto: " + ex.Message);
             }
         });
+    }
+
+    // Cada actualización deja su instalador (decenas de MB) en la carpeta de
+    // actualizaciones. Al arrancar se borran los de versiones ya instaladas y
+    // las descargas a medias que quedaron de sesiones anteriores.
+    void CleanupOldDownloads()
+    {
+        try
+        {
+            var dir = new DirectoryInfo(_updatesDir);
+            if (!dir.Exists) return;
+            foreach (var file in dir.GetFiles())
+            {
+                var delete = file.Name.EndsWith(".part", StringComparison.OrdinalIgnoreCase);
+                if (!delete && file.Name.StartsWith("LyricGlowSetup-", StringComparison.OrdinalIgnoreCase) &&
+                    file.Extension.Equals(".exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    var version = ReleaseClient.ParseVersion(
+                        Path.GetFileNameWithoutExtension(file.Name)["LyricGlowSetup-".Length..]);
+                    delete = version is not null && version <= CurrentVersion;
+                }
+
+                if (!delete) continue;
+                try
+                {
+                    file.Delete();
+                    Log.Write($"update: limpieza de {file.Name}");
+                }
+                catch
+                {
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Write("update cleanup: " + ex.Message);
+        }
     }
 
     public async Task CheckAsync(bool manual, CancellationToken ct = default)

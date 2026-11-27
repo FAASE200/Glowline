@@ -35,7 +35,7 @@ public sealed class LyricsPlusClient
     static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
 
     static HttpClient CreateClient() =>
-        ExternalHttp.CreateClient(TimeSpan.FromSeconds(25), "LyricGlow/0.9 (synchronized lyrics)",
+        ExternalHttp.CreateClient(TimeSpan.FromSeconds(25), AppInfo.UserAgent,
             "application/json");
 
     public async Task<LrclibTrack?> GetAsync(

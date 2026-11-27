@@ -1030,5 +1030,5 @@ public sealed class CoverArtService
 
     static HttpClient CreateClient() =>
         ExternalHttp.CreateClient(TimeSpan.FromSeconds(8),
-            "LyricGlow/0.9.2 (personal Windows lyric overlay)", "application/json", "image/*");
+            AppInfo.UserAgent, "application/json", "image/*");
 }

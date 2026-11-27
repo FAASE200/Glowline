@@ -642,5 +642,5 @@ public sealed class AnimatedArtworkService
 
     static HttpClient CreateClient() =>
         ExternalHttp.CreateClient(TimeSpan.FromSeconds(12),
-            "LyricGlow/0.9.2 (personal Windows lyric overlay)", "application/json");
+            AppInfo.UserAgent, "application/json");
 }
