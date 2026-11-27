@@ -56,6 +56,14 @@ public sealed class LyricsService
     readonly LyricsPlusClient _lyricsPlus = new();
 
     CancellationTokenSource? _cts;
+
+    // Null-safe: un ajuste guardado a mano con "null" no debe romper la app
+    // (Android carga los ajustes sin la normalización de Windows).
+    Dictionary<string, Dictionary<string, int>> LineOffsets =>
+        _settings.Settings.PerLineOffsetMs ??= new Dictionary<string, Dictionary<string, int>>();
+
+    Dictionary<string, string> ManualPins =>
+        _settings.Settings.ManualPins ??= new Dictionary<string, string>();
     IReadOnlyList<LrcLine> _sourceLines = Array.Empty<LrcLine>();
     long _resolveGeneration;
     SessionSnapshot? _snapshot;
@@ -150,7 +158,7 @@ public sealed class LyricsService
                 return;
             }
 
-            if (_settings.Settings.ManualPins.ContainsKey(key))
+            if (ManualPins.ContainsKey(key))
             {
                 var pinned = LoadPinned(key);
                 if (pinned is not null)
@@ -160,7 +168,7 @@ public sealed class LyricsService
                     return;
                 }
                 // El archivo de la letra fijada desapareció: se vuelve a la búsqueda normal.
-                _settings.Settings.ManualPins.Remove(key);
+                ManualPins.Remove(key);
                 _settings.ScheduleSave();
             }
 
@@ -572,13 +580,13 @@ public sealed class LyricsService
 
     public bool HasManualOverride =>
         Track is not null && (_settings.Settings.ManualOverrides.ContainsKey(Track.Key) ||
-                              _settings.Settings.ManualPins.ContainsKey(Track.Key));
+                              ManualPins.ContainsKey(Track.Key));
 
     public void ClearManualOverride()
     {
         if (Track is null) return;
         _settings.Settings.ManualOverrides.Remove(Track.Key);
-        if (_settings.Settings.ManualPins.Remove(Track.Key)) DeletePinned(Track.Key);
+        if (ManualPins.Remove(Track.Key)) DeletePinned(Track.Key);
         _settings.ScheduleSave();
         _ = ResolveAsync(Track, ignoreCache: true);
     }
@@ -600,7 +608,7 @@ public sealed class LyricsService
     {
         var lines = Lines;
         if (Track is null || index < 0 || index >= lines.Count) return 0;
-        return _settings.Settings.PerLineOffsetMs.TryGetValue(Track.Key, out var map) &&
+        return LineOffsets.TryGetValue(Track.Key, out var map) && map is not null &&
                map.TryGetValue(LineId(lines[index]), out var value)
             ? value
             : 0;
@@ -610,8 +618,8 @@ public sealed class LyricsService
     {
         var lines = Lines;
         if (Track is null || State != LyricsState.Synced || index < 0 || index >= lines.Count) return;
-        var all = _settings.Settings.PerLineOffsetMs;
-        if (!all.TryGetValue(Track.Key, out var map))
+        var all = LineOffsets;
+        if (!all.TryGetValue(Track.Key, out var map) || map is null)
         {
             map = new Dictionary<string, int>();
             all[Track.Key] = map;
@@ -630,9 +638,9 @@ public sealed class LyricsService
     {
         var lines = Lines;
         if (Track is null || index < 0 || index >= lines.Count) return;
-        if (!_settings.Settings.PerLineOffsetMs.TryGetValue(Track.Key, out var map)) return;
+        if (!LineOffsets.TryGetValue(Track.Key, out var map) || map is null) return;
         if (!map.Remove(LineId(lines[index]))) return;
-        if (map.Count == 0) _settings.Settings.PerLineOffsetMs.Remove(Track.Key);
+        if (map.Count == 0) LineOffsets.Remove(Track.Key);
         _settings.ScheduleSave();
         RefreshDisplayLines();
     }
@@ -651,7 +659,7 @@ public sealed class LyricsService
     IReadOnlyList<LrcLine> BuildDisplayLines(TrackInfo track)
     {
         var source = _sourceLines;
-        _settings.Settings.PerLineOffsetMs.TryGetValue(track.Key, out var offsets);
+        LineOffsets.TryGetValue(track.Key, out var offsets);
         return BuildDisplayLines(source, offsets, _settings.Settings.RomanizationEnabled);
     }
 
@@ -828,12 +836,12 @@ public sealed class LyricsService
             // Las letras de Lrcmux y LyricsPlus no tienen un id estable: se
             // guarda una copia fija que no caduca con la caché.
             _settings.Settings.ManualOverrides.Remove(key);
-            _settings.Settings.ManualPins[key] = result.Provider;
+            ManualPins[key] = result.Provider;
             SavePinned(key, result);
         }
         else
         {
-            if (_settings.Settings.ManualPins.Remove(key)) DeletePinned(key);
+            if (ManualPins.Remove(key)) DeletePinned(key);
             _settings.Settings.ManualOverrides[key] = result.Id;
             SaveCache(AlbumCacheKey(LyricSource.Lrclib, key, Track.Album), result);
         }

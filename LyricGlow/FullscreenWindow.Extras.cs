@@ -57,21 +57,40 @@ public partial class FullscreenWindow
     static string FormatOffset(int ms) =>
         (ms > 0 ? "+" : "−") + (Math.Abs(ms) / 1000.0).ToString("0.0#", System.Globalization.CultureInfo.CurrentCulture) + " s";
 
-    /// <summary>Comparte la línea indicada, o la actual si es -1.</summary>
-    public void ShareLine(int index = -1)
+    /// <summary>
+    /// Comparte la línea indicada, o la que suena si es -1. Usa la letra y la
+    /// portada de los servicios, así funciona también con la pantalla completa
+    /// cerrada (por ejemplo, desde el atajo global).
+    /// </summary>
+    public async void ShareLine(int index = -1)
     {
-        if (index < 0) index = _currentLine;
-        var track = _lyrics.Track;
-        if (track is null || index < 0 || index >= _lines.Count)
-        {
-            App.MainWindowRef?.ShowNotice(Loc.T("ShareNothing"));
-            return;
-        }
-
         try
         {
+            var track = _lyrics.Track;
+            var lines = _lyrics.Lines;
+            if (index < 0 && _lyrics.State == LyricsState.Synced)
+                index = _lyrics.GetLineIndex(_lyrics.GetAdjustedPosition());
+            if (track is null || index < 0 || index >= lines.Count)
+            {
+                App.MainWindowRef?.ShowNotice(Loc.T("ShareNothing"));
+                return;
+            }
+
+            var line = lines[index];
+            byte[]? art = null;
+            try
+            {
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(4));
+                var cover = await App.CoverArt.GetAsync(track, cts.Token);
+                if (cover.HasImage) art = cover.Bytes;
+            }
+            catch (Exception ex)
+            {
+                Log.Write("share cover: " + ex.Message);
+            }
+
             var accent = _fusionBackground == Colors.White ? Color.FromRgb(0xFF, 0x3B, 0x30) : _fusionBackground;
-            var path = ShareCardService.CreateAndSave(_lines[index], track, _artBytes, accent);
+            var path = ShareCardService.CreateAndSave(line, track, art, accent);
             App.MainWindowRef?.ShowNotice(Loc.F("ShareSavedFormat", path));
         }
         catch (Exception ex)

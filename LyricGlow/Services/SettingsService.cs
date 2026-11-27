@@ -193,6 +193,54 @@ public sealed class SettingsService : IAppSettingsStore
                 kept++;
             }
         }
+
+        NormalizeExtras(s);
+    }
+
+    // Ajustes de la 0.9.40. Un settings.json editado a mano o dañado no debe
+    // dejar diccionarios en null ni valores fuera de rango.
+    static void NormalizeExtras(AppSettings s)
+    {
+        s.PerLineOffsetMs ??= new Dictionary<string, Dictionary<string, int>>();
+        var tracks = 0;
+        foreach (var key in new List<string>(s.PerLineOffsetMs.Keys))
+        {
+            var map = s.PerLineOffsetMs[key];
+            if (string.IsNullOrWhiteSpace(key) || key.Length > MaxKeyChars || map is null ||
+                tracks >= MaxDictionaryEntries)
+            {
+                s.PerLineOffsetMs.Remove(key);
+                continue;
+            }
+            foreach (var lineKey in new List<string>(map.Keys))
+            {
+                if (lineKey.Length is 0 or > 16 || map.Count > 2000)
+                {
+                    map.Remove(lineKey);
+                    continue;
+                }
+                map[lineKey] = Clamp(map[lineKey], -LyricsService.MaxLineOffsetMs, LyricsService.MaxLineOffsetMs, 0);
+            }
+            if (map.Count == 0) s.PerLineOffsetMs.Remove(key);
+            else tracks++;
+        }
+
+        s.ManualPins ??= new Dictionary<string, string>();
+        var pins = 0;
+        foreach (var key in new List<string>(s.ManualPins.Keys))
+        {
+            if (string.IsNullOrWhiteSpace(key) || key.Length > MaxKeyChars || pins >= MaxDictionaryEntries ||
+                s.ManualPins[key] is not ("Lrcmux" or "LyricsPlus"))
+            {
+                s.ManualPins.Remove(key);
+                continue;
+            }
+            pins++;
+        }
+
+        if (s.ObsOverlayPort is < 1024 or > 65535) s.ObsOverlayPort = 7531;
+        if (s.MiniLyricsLeft is { } left && !double.IsFinite(left)) s.MiniLyricsLeft = null;
+        if (s.MiniLyricsTop is { } top && !double.IsFinite(top)) s.MiniLyricsTop = null;
     }
 
     static string CleanSetting(string? value, int maxLength, string fallback)

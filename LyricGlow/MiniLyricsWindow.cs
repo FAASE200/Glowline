@@ -70,6 +70,12 @@ public sealed class MiniLyricsWindow : Window
         ResizeMode = ResizeMode.NoResize;
         SizeToContent = SizeToContent.Height;
         Width = 560;
+        // Posición inicial aproximada para que no aparezca un instante en la esquina
+        // superior izquierda; al cargar se ajusta con el alto real.
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        var area = SystemParameters.WorkArea;
+        Left = App.Settings.Settings.MiniLyricsLeft ?? area.Right - Width - 24;
+        Top = App.Settings.Settings.MiniLyricsTop ?? area.Bottom - 130;
 
         _title = new TextBlock
         {

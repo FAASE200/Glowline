@@ -96,12 +96,23 @@ public sealed class NowPlayingHub : IDisposable
 
     void Publish(Snapshot snapshot)
     {
-        var changed = _last is null || _last with { Position = snapshot.Position } != snapshot;
-        var seeked = _last is not null && Math.Abs(snapshot.Position - _last.Position) > 2.5 &&
-                     snapshot.TrackKey == _last.TrackKey;
+        // Discord solo muestra canción, artista y tiempo: se le avisa cuando
+        // cambia algo de eso (o se salta en la canción), no en cada línea.
+        var last = _last;
+        var discordChanged = last is null ||
+                             last.TrackKey != snapshot.TrackKey ||
+                             last.Playing != snapshot.Playing ||
+                             last.Title != snapshot.Title ||
+                             last.Artist != snapshot.Artist ||
+                             last.Album != snapshot.Album ||
+                             last.Duration != snapshot.Duration;
+        // Entre dos ticks (200 ms) la posición avanza poco; un salto grande es un seek.
+        var expected = last is null ? 0 : last.Position + (last.Playing ? 0.2 : 0);
+        var seeked = last is not null && last.TrackKey == snapshot.TrackKey &&
+                     Math.Abs(snapshot.Position - expected) > 2.5;
         _last = snapshot;
         _overlay.Update(snapshot, _cover);
-        if (changed || seeked) _discord.Update(snapshot);
+        if (discordChanged || seeked) _discord.Update(snapshot);
     }
 
     async void RefreshCover(TrackInfo track)
