@@ -136,12 +136,12 @@ public partial class App : Application
         }
         if (Settings.Settings.SchemaVersion < 4)
         {
-            // La versión anterior activaba el render por software por defecto,
-            // que en la mayoría de equipos solo reduce los fotogramas.
+            // The previous version turned on software rendering by default,
+            // which on most machines only lowers the frame rate.
             if (Settings.Settings.SoftwareRendering)
             {
                 Settings.Settings.SoftwareRendering = false;
-                Log.Write("settings: render por software desactivado en la migración");
+                Log.Write("settings: software rendering turned off during migration");
             }
             Settings.Settings.SchemaVersion = 4;
             migrated = true;
@@ -318,7 +318,7 @@ public partial class App : Application
 
             if (track is null)
             {
-                Console.WriteLine("coverprobe: sin pista");
+                Console.WriteLine("coverprobe: no track");
             }
             else
             {
@@ -352,7 +352,7 @@ public partial class App : Application
             }, CancellationToken.None);
             Console.WriteLine(result.Available
                 ? $"animprobe: {artist} — {album} -> {result.Source} {result.Path}"
-                : $"animprobe: {artist} — {album} -> sin animación ({result.ErrorKey ?? "none"})");
+                : $"animprobe: {artist} — {album} -> no animation ({result.ErrorKey ?? "none"})");
         }
         catch (Exception ex)
         {
@@ -370,7 +370,7 @@ public partial class App : Application
         {
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             {
-                Console.WriteLine("animframe: archivo no encontrado");
+                Console.WriteLine("animframe: file not found");
                 IsExiting = true;
                 Shutdown(1);
                 return;
@@ -384,7 +384,7 @@ public partial class App : Application
             player.Play();
             if (await Task.WhenAny(opened.Task, Task.Delay(5000)) != opened.Task || !opened.Task.Result)
             {
-                Console.WriteLine("animframe: no se pudo abrir");
+                Console.WriteLine("animframe: could not open");
                 player.Close();
                 IsExiting = true;
                 Shutdown(2);
@@ -427,7 +427,7 @@ public partial class App : Application
                 }
             }
             var center = (h / 2) * stride + (w / 2) * 4;
-            Console.WriteLine($"animframe: {w}x{h} borde=({rr / n},{gg / n},{bb / n}) " +
+            Console.WriteLine($"animframe: {w}x{h} border=({rr / n},{gg / n},{bb / n}) " +
                               $"centro=({buffer[center + 2]},{buffer[center + 1]},{buffer[center]}) -> {outPath}");
             player.Close();
         }
@@ -582,9 +582,9 @@ public partial class App : Application
             {
                 Track = new TrackInfo
                 {
-                    Title = "Un título de canción extraordinariamente largo que no cabe en una sola línea",
-                    Artist = "Un artista con un nombre larguísimo y una colaboración más larga todavía",
-                    Album = "Un álbum con un nombre igual de interminable que el resto",
+                    Title = "An extraordinarily long song title that does not fit on a single line",
+                    Artist = "An artist with a very long name and an even longer collaboration",
+                    Album = "An album with a name just as endless as the rest",
                     DurationSeconds = 3725,
                 },
                 DurationSeconds = 3725,

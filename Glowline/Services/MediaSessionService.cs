@@ -98,10 +98,10 @@ public sealed class MediaSessionService : IDisposable
                 if (exact is not null) return exact;
             }
 
-            // Con dos apps reproduciendo a la vez (p. ej. Apple Music y un video
-            // del navegador) elegir "la primera que suena" cambiaba de sesión en
-            // cada refresco y reiniciaba la letra. Mantener la sesión actual
-            // mientras siga sonando evita ese vaivén.
+            // With two apps playing at once (e.g. Apple Music and a browser
+            // video), picking "the first one playing" switched sessions on
+            // every refresh and restarted the lyrics. Keeping the current session
+            // while it is still playing avoids that back-and-forth.
             var previous = _session is null
                 ? null
                 : sessions.FirstOrDefault(s => SameSource(s, _session));
@@ -155,8 +155,8 @@ public sealed class MediaSessionService : IDisposable
         }
 
         _session = session;
-        // Volatile para que SeekAsync vea el cambio hecho por RefreshAsync en el
-        // hilo de entrada aunque el seek esté a mitad de un await.
+        // Volatile so SeekAsync sees the change made by RefreshAsync on the
+        // input thread even while the seek is in the middle of an await.
         Volatile.Write(ref _currentSession, session);
         _props = null;
         _propsAt = DateTimeOffset.MinValue;
@@ -180,7 +180,7 @@ public sealed class MediaSessionService : IDisposable
 
     async Task RefreshAsync()
     {
-        // El guard de disposed también cubre los callbacks encolados antes de Dispose.
+        // The disposed guard also covers callbacks queued before Dispose.
         if (_disposed || _busy) return;
         _busy = true;
         try
@@ -378,7 +378,7 @@ public sealed class MediaSessionService : IDisposable
 
         if (isApple && await AppleMusicSeeker.SeekAsync(positionSeconds))
         {
-            // Solo se desplaza la timeline si la sesión capturada sigue siendo la actual.
+            // Only shift the timeline if the captured session is still the current one.
             if (!IsCurrentSession(session)) return false;
             _timeline.NotifySeek(positionSeconds, DateTimeOffset.Now);
             return true;

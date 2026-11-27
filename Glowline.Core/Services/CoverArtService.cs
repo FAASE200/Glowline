@@ -133,8 +133,8 @@ public sealed class CoverArtService
         }
         finally
         {
-            // Solo se quita LA tarea que se usó aquí: si ya terminó y otro
-            // resolve reemplazó la entrada, borrarla mataría la tarea nueva.
+            // Only remove THE task used here: if it already finished and another
+            // resolve replaced the entry, removing it would kill the new task.
             if (task.IsCompleted)
                 _inflight.TryRemove(new KeyValuePair<string, Task<CoverArtResult>>(key, task));
             else
@@ -170,7 +170,7 @@ public sealed class CoverArtService
         !result.HasImage ? NegativeTtl :
         result.IsHighResolution ? TimeSpan.FromHours(6) : LowResTtl;
 
-    // Debe llamarse con _cacheLock tomado.
+    // Must be called with _cacheLock held.
     void RememberMemory(string key, CoverArtResult result)
     {
         RemoveMemoryLocked(key);
@@ -191,14 +191,14 @@ public sealed class CoverArtService
                 oldestAt = entry.Value.At;
                 oldestKey = entry.Key;
             }
-            // Si dos entradas comparten marca de tiempo no se puede avanzar;
-            // salir evita un bucle infinito y deja el tope de entradas como red.
+            // If two entries share a timestamp no progress can be made;
+            // bailing out avoids an infinite loop and leaves the entry cap as a safety net.
             if (oldestKey is null) return;
             RemoveMemoryLocked(oldestKey);
         }
     }
 
-    // Quita la entrada y descuenta sus bytes UNA sola vez.
+    // Removes the entry and subtracts its bytes exactly ONCE.
     void RemoveMemoryLocked(string key)
     {
         if (!_memory.Remove(key, out var removed)) return;
@@ -212,12 +212,12 @@ public sealed class CoverArtService
     {
         var thumb = ReadPlayerThumb(track, await _media.ReadThumbnailAsync(track.Title, track.Artist));
 
-        // La carátula del reproductor manda si ya tiene resolución suficiente;
-        // iTunes/Deezer solo se consultan cuando la miniatura es pequeña o falta.
+        // The player's cover wins if it already has enough resolution;
+        // iTunes/Deezer are only queried when the thumbnail is small or missing.
         if (thumb.IsHighResolution)
         {
             RememberAlbum(track, thumb, track.Album);
-            Log.Write($"cover: '{track.DisplayName}' -> reproductor " +
+            Log.Write($"cover: '{track.DisplayName}' -> player " +
                       $"{thumb.PixelWidth}x{thumb.PixelHeight} (calidad suficiente)");
             return thumb;
         }
@@ -225,7 +225,7 @@ public sealed class CoverArtService
         var albumKey = AlbumCacheKey(track.Album, track.Artist);
         if (albumKey.Length > 0 && TryGetAlbum(albumKey, out var albumArt))
         {
-            Log.Write($"cover: '{track.DisplayName}' -> misma carátula del álbum " +
+            Log.Write($"cover: '{track.DisplayName}' -> same album cover " +
                       $"({albumArt.Source} {albumArt.PixelWidth}x{albumArt.PixelHeight})");
             return albumArt;
         }
@@ -234,7 +234,7 @@ public sealed class CoverArtService
         if (disk.HasImage)
         {
             RememberAlbum(track, disk, string.IsNullOrWhiteSpace(track.Album) ? disk.Album : track.Album);
-            Log.Write($"cover: '{track.DisplayName}' -> {disk.Source} en caché " +
+            Log.Write($"cover: '{track.DisplayName}' -> {disk.Source} cached " +
                       $"{disk.PixelWidth}x{disk.PixelHeight}");
             return disk;
         }
@@ -247,7 +247,7 @@ public sealed class CoverArtService
             RememberAlbum(track, chosen, string.IsNullOrWhiteSpace(track.Album) ? chosen.Album : track.Album);
             Log.Write($"cover: '{track.DisplayName}' -> iTunes {itunes.PixelWidth}x{itunes.PixelHeight} " +
                       $"'{itunes.Title}' / '{itunes.Artist}' / '{itunes.Album}'" +
-                      $" (reproductor {(thumb.HasImage ? $"{thumb.PixelWidth}x{thumb.PixelHeight}" : "sin miniatura")})");
+                      $" (player {(thumb.HasImage ? $"{thumb.PixelWidth}x{thumb.PixelHeight}" : "no thumbnail")})");
             return chosen;
         }
 
@@ -259,7 +259,7 @@ public sealed class CoverArtService
             RememberAlbum(track, chosen, string.IsNullOrWhiteSpace(track.Album) ? chosen.Album : track.Album);
             Log.Write($"cover: '{track.DisplayName}' -> Deezer {deezer.PixelWidth}x{deezer.PixelHeight} " +
                       $"'{deezer.Title}' / '{deezer.Artist}' / '{deezer.Album}'" +
-                      $" (reproductor {(thumb.HasImage ? $"{thumb.PixelWidth}x{thumb.PixelHeight}" : "sin miniatura")})");
+                      $" (player {(thumb.HasImage ? $"{thumb.PixelWidth}x{thumb.PixelHeight}" : "no thumbnail")})");
             return chosen;
         }
 
@@ -270,7 +270,7 @@ public sealed class CoverArtService
             if (albumCover.HasImage)
             {
                 RememberAlbum(track, albumCover, track.Album);
-                Log.Write($"cover: '{track.DisplayName}' -> {albumCover.Source} álbum " +
+                Log.Write($"cover: '{track.DisplayName}' -> {albumCover.Source} album " +
                           $"{albumCover.PixelWidth}x{albumCover.PixelHeight} " +
                           $"'{albumCover.Album}' / '{albumCover.Artist}'");
                 return albumCover;
@@ -280,12 +280,12 @@ public sealed class CoverArtService
         if (thumb.HasImage)
         {
             RememberAlbum(track, thumb, track.Album);
-            Log.Write($"cover: '{track.DisplayName}' -> reproductor " +
-                      $"{thumb.PixelWidth}x{thumb.PixelHeight} (sin respaldo externo)");
+            Log.Write($"cover: '{track.DisplayName}' -> player " +
+                      $"{thumb.PixelWidth}x{thumb.PixelHeight} (no external fallback)");
             return thumb;
         }
 
-        Log.Write($"cover: '{track.DisplayName}' -> sin carátula");
+        Log.Write($"cover: '{track.DisplayName}' -> no cover");
         return new CoverArtResult();
     }
 
@@ -314,23 +314,23 @@ public sealed class CoverArtService
 
         if (stale)
         {
-            Log.Write($"cover: '{track.DisplayName}' -> miniatura del reproductor desfasada (se ignora)");
+            Log.Write($"cover: '{track.DisplayName}' -> player thumbnail is out of date (ignored)");
             return new CoverArtResult();
         }
 
-        return MakeResult(bytes, "Reproductor", track.Album, track.Artist, track.Title);
+        return MakeResult(bytes, "Player", track.Album, track.Artist, track.Title);
     }
 
     void RememberAlbum(TrackInfo track, CoverArtResult result, string album)
     {
         if (!result.HasImage) return;
-        if (result.Source == "Reproductor" && !result.IsHighResolution) return;
+        if (result.Source == "Player" && !result.IsHighResolution) return;
         var key = AlbumCacheKey(album, track.Artist);
         if (key.Length == 0) return;
         lock (_cacheLock)
         {
-            // Seq = último uso. Se conserva el de la entrada previa al reemplazar,
-            // para que "ganar" una carátula no la convierta en la más reciente.
+            // Seq = last use. The previous entry's value is kept when replacing,
+            // so that "winning" a cover does not make it the most recent one.
             long seq;
             if (_albumCache.TryGetValue(key, out var existing))
             {
@@ -359,7 +359,7 @@ public sealed class CoverArtService
         }
     }
 
-    // Debe llamarse con _cacheLock tomado.
+    // Must be called with _cacheLock held.
     void TouchAlbumLocked(string key)
     {
         if (_albumCache.TryGetValue(key, out var entry))
@@ -452,7 +452,7 @@ public sealed class CoverArtService
             if (resp.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.Forbidden)
             {
                 _itunesCooldownUntil = DateTime.UtcNow.AddMinutes(2);
-                Log.Write($"cover: iTunes limit {(int)resp.StatusCode}; usando Deezer");
+                Log.Write($"cover: iTunes limit {(int)resp.StatusCode}; using Deezer");
                 return new CoverArtResult();
             }
             if (!resp.IsSuccessStatusCode)
@@ -503,10 +503,10 @@ public sealed class CoverArtService
             {
                 if (includeAlbum && !string.IsNullOrWhiteSpace(track.Album))
                 {
-                    Log.Write($"cover: iTunes sin coincidencia con álbum para '{track.DisplayName}'; reintento artista+título");
+                    Log.Write($"cover: iTunes has no match with album for '{track.DisplayName}'; retrying artist+title");
                     return await TryItunesAsync(track, ct, includeAlbum: false, download);
                 }
-                Log.Write($"cover: iTunes sin coincidencia para '{track.DisplayName}'");
+                Log.Write($"cover: iTunes has no match for '{track.DisplayName}'");
                 return new CoverArtResult();
             }
 
@@ -531,7 +531,7 @@ public sealed class CoverArtService
             }
             if (bytes is null)
             {
-                Log.Write($"cover: iTunes sin imagen descargable para '{track.DisplayName}'");
+                Log.Write($"cover: iTunes has no downloadable image for '{track.DisplayName}'");
                 return new CoverArtResult();
             }
             return MakeResult(bytes, "iTunes", bestAlbum, bestArtist, bestTitle, ArtworkAt(artwork, PublicArtworkSide));
@@ -611,7 +611,7 @@ public sealed class CoverArtService
             {
                 if (includeAlbum && !string.IsNullOrWhiteSpace(track.Album))
                 {
-                    Log.Write($"cover: Deezer sin coincidencia con álbum para '{track.DisplayName}'; reintento artista+título");
+                    Log.Write($"cover: Deezer has no match with album for '{track.DisplayName}'; retrying artist+title");
                     return await TryDeezerAsync(track, ct, includeAlbum: false);
                 }
                 return new CoverArtResult();
@@ -700,7 +700,7 @@ public sealed class CoverArtService
         }
         catch (Exception ex)
         {
-            Log.Write("cover iTunes álbum: " + ex.Message);
+            Log.Write("cover iTunes album: " + ex.Message);
             return new CoverArtResult();
         }
     }
@@ -764,7 +764,7 @@ public sealed class CoverArtService
         }
         catch (Exception ex)
         {
-            Log.Write("cover Deezer álbum: " + ex.Message);
+            Log.Write("cover Deezer album: " + ex.Message);
             return new CoverArtResult();
         }
     }
@@ -786,7 +786,7 @@ public sealed class CoverArtService
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || !ArtworkHosts.Allows(uri))
             {
-                Log.Write("cover download: host de imagen no permitido");
+                Log.Write("cover download: image host not allowed");
                 return null;
             }
 
@@ -833,8 +833,8 @@ public sealed class CoverArtService
             if (durationDiff > 15) return double.NegativeInfinity;
         }
 
-        // Una variante (remix/live/etc.) solo se acepta si el álbum o la
-        // duración confirman que es la misma grabación.
+        // A variant (remix/live/etc.) is only accepted if the album or the
+        // duration confirms it is the same recording.
         if (!exactTitle && !(albumMatch == true || (durationDiff is not null && durationDiff <= 5)))
             return double.NegativeInfinity;
 
@@ -961,7 +961,7 @@ public sealed class CoverArtService
         var (width, height) = ImageSize(bytes);
         if (!IsAcceptableImageSize(width, height))
         {
-            Log.Write($"cover: imagen rechazada {width}x{height}");
+            Log.Write($"cover: image rejected {width}x{height}");
             return new CoverArtResult();
         }
         return new CoverArtResult

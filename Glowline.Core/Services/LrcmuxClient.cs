@@ -66,7 +66,7 @@ public sealed class LrcmuxClient
 
             using var doc = await ExternalHttp.ReadJsonAsync(resp, ExternalHttp.MaxJsonBytes, ct);
             if (doc.RootElement.ValueKind != JsonValueKind.Object)
-                throw new ExternalDataException("Lrcmux devolvió un objeto inesperado.");
+                throw new ExternalDataException("Lrcmux returned an unexpected object.");
 
             var data = doc.RootElement.Deserialize<Response>(JsonOpts);
             return ToTrack(data, title, artist);
@@ -96,7 +96,7 @@ public sealed class LrcmuxClient
         if (data?.Lines is not { Count: > 0 } lines) return null;
         if (lines.Count > MaxLines)
         {
-            Log.Write($"Lrcmux: {lines.Count} líneas exceden el límite");
+            Log.Write($"Lrcmux: {lines.Count} lines exceed the limit");
             return null;
         }
 
@@ -184,7 +184,7 @@ public sealed class LrcmuxClient
 
             if (sb.Length > ExternalHttp.MaxLyricsChars)
             {
-                Log.Write("Lrcmux: letra generada demasiado larga");
+                Log.Write("Lrcmux: generated lyrics too long");
                 return null;
             }
         }

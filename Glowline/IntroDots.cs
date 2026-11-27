@@ -91,12 +91,12 @@ public sealed class IntroDots : StackPanel
             ? Math.Clamp((positionSeconds - startSeconds) / (endSeconds - startSeconds), 0, 1)
             : 1;
 
-        // Respiración lenta mientras se espera el verso.
+        // Slow breathing while waiting for the verse.
         var breathTime = Math.Max(0, positionSeconds - startSeconds);
         var breath = 1 + 0.09 * Math.Sin(2 * Math.PI * breathTime / 2.4);
 
-        // En el último tramo crecen de más y se achican hasta desaparecer
-        // justo cuando entra el verso.
+        // In the last stretch they overgrow and then shrink until they disappear
+        // right as the verse comes in.
         var remaining = Math.Max(0, endSeconds - positionSeconds);
         var swell = endSeconds > startSeconds ? Math.Clamp(1 - remaining / 1.3, 0, 1) : 0;
         double entryScale;

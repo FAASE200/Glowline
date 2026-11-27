@@ -11,7 +11,7 @@ if (-not $Version) {
 
 $publishTokenPath = Join-Path $root '.secrets\publish.token'
 $tokenPath = if (Test-Path $publishTokenPath) { $publishTokenPath } else { Join-Path $root '.secrets\update.token' }
-if (-not (Test-Path $tokenPath)) { throw "Falta $tokenPath" }
+if (-not (Test-Path $tokenPath)) { throw "Missing $tokenPath" }
 $token = (Get-Content $tokenPath -Raw).Trim()
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -31,7 +31,7 @@ foreach ($name in @("GlowlineSetup-$Version.exe")) {
         continue
     }
     $file = Join-Path $root "publish\$name"
-    if (-not (Test-Path $file)) { throw "Falta $file; ejecuta tools\build-installers.ps1" }
+    if (-not (Test-Path $file)) { throw "Missing $file; run tools\build-installers.ps1" }
     $uri = "https://uploads.github.com/repos/FAASE200/Glowline/releases/$($rel.id)/assets?name=$name"
     $resp = Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -InFile $file -ContentType 'application/octet-stream' -TimeoutSec 900
     Write-Host "Subido: $($resp.name) | $($resp.size) bytes | $($resp.digest)"

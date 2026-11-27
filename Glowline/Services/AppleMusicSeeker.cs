@@ -64,7 +64,7 @@ static class AppleMusicSeeker
             var range = FindSlider();
             if (range is null)
             {
-                Log.Write("Apple Music seek: no se encontró la barra de progreso");
+                Log.Write("Apple Music seek: progress bar not found");
                 return false;
             }
 

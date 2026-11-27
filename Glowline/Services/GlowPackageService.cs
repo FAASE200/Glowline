@@ -18,9 +18,9 @@ public sealed class GlowPackage
 }
 
 /// <summary>
-/// Lee y escribe el formato .glow (ZIP: manifest.json + preview.png opcional).
-/// La validación es intencionalmente estricta: un paquete importado nunca debe
-/// poder llevar valores imposibles ni rutas maliciosas al diseño activo.
+/// Reads and writes the .glow format (ZIP: manifest.json + optional preview.png).
+/// Validation is strict on purpose: an imported package must never be able
+/// to carry impossible values or malicious paths into the active design.
 /// </summary>
 public static class GlowPackageService
 {
@@ -44,18 +44,18 @@ public static class GlowPackageService
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         if (profile.Name.Length > 200 || profile.Author.Length > 200 || profile.Description.Length > 2000)
-            throw new InvalidDataException("El nombre, autor o descripción del diseño superan la longitud máxima permitida.");
+            throw new InvalidDataException("The design name, author or description exceeds the maximum allowed length.");
 
         var dir = Path.GetDirectoryName(Path.GetFullPath(path));
-        if (string.IsNullOrEmpty(dir)) throw new IOException($"Ruta de destino no válida: '{path}'.");
+        if (string.IsNullOrEmpty(dir)) throw new IOException($"Invalid destination path: '{path}'.");
         Directory.CreateDirectory(dir);
 
         if (previewPng is { Length: > 0 })
         {
             if (previewPng.Length > MaxPreviewBytes)
-                throw new InvalidDataException("La miniatura supera el tamaño máximo permitido.");
+                throw new InvalidDataException("The preview image exceeds the maximum allowed size.");
             if (!IsPng(previewPng))
-                throw new InvalidDataException("La miniatura no es un PNG válido.");
+                throw new InvalidDataException("The preview image is not a valid PNG.");
         }
 
         var json = BuildManifestJson(profile);
@@ -90,19 +90,19 @@ public static class GlowPackageService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var fullPath = Path.GetFullPath(path);
-        if (!File.Exists(fullPath)) throw new FileNotFoundException("El paquete de diseño no existe.", fullPath);
+        if (!File.Exists(fullPath)) throw new FileNotFoundException("The design package does not exist.", fullPath);
 
         var info = new FileInfo(fullPath);
         if (info.Length > MaxZipBytes)
-            throw new InvalidDataException($"El archivo supera el límite de {MaxZipBytes / (1024 * 1024)} MB.");
+            throw new InvalidDataException($"The file exceeds the {MaxZipBytes / (1024 * 1024)} MB limit.");
 
-        // Todo se lee en memoria: un paquete inválido no deja nada extraído en disco.
+        // Everything is read in memory: an invalid package leaves nothing extracted on disk.
         byte[] zipBytes = await Task.Run(() => File.ReadAllBytes(fullPath), ct).ConfigureAwait(false);
 
         using var ms = new MemoryStream(zipBytes, writable: false);
         using var zip = OpenValidatedArchive(ms, ct);
 
-        var manifestEntry = zip.Entries[0]; // la entrada 0 está garantizada ser manifest.json por OpenValidatedArchive
+        var manifestEntry = zip.Entries[0]; // OpenValidatedArchive guarantees that entry 0 is manifest.json
         string manifestJson;
         using (var reader = new StreamReader(ReadEntryCapped(manifestEntry, MaxManifestBytes, ManifestName), Encoding.UTF8))
             manifestJson = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
@@ -116,7 +116,7 @@ public static class GlowPackageService
             using (var stream = ReadEntryCapped(previewEntry, MaxPreviewBytes, PreviewName))
                 preview = stream.ToArray();
             if (!IsPng(preview))
-                throw new InvalidDataException("La miniatura preview.png no es un PNG válido.");
+                throw new InvalidDataException("preview.png is not a valid PNG.");
         }
 
         return new GlowPackage { Profile = profile, PreviewPng = preview };
@@ -136,16 +136,16 @@ public static class GlowPackageService
         try { zip = new ZipArchive(ms, ZipArchiveMode.Read, leaveOpen: true); }
         catch (InvalidDataException ex)
         {
-            throw new InvalidDataException("El archivo no es un paquete .glow válido.", ex);
+            throw new InvalidDataException("The file is not a valid .glow package.", ex);
         }
 
         using (zip)
         {
             if (zip.Entries.Count == 0 || zip.Entries.Count > MaxEntries)
-                throw new InvalidDataException($"El paquete debe tener entre 1 y {MaxEntries} entradas (tiene {zip.Entries.Count}).");
+                throw new InvalidDataException($"The package must have between 1 and {MaxEntries} entries (it has {zip.Entries.Count}).");
 
             if (!string.Equals(zip.Entries[0].FullName, ManifestName, StringComparison.Ordinal))
-                throw new InvalidDataException($"La primera entrada debe ser '{ManifestName}'.");
+                throw new InvalidDataException($"The first entry must be '{ManifestName}'.");
 
             long total = 0;
             var names = new HashSet<string>(StringComparer.Ordinal);
@@ -154,20 +154,20 @@ public static class GlowPackageService
                 var name = entry.FullName;
                 if (name.Contains("..") || name.Contains('\\') || name.Contains('/')
                     || (name.IndexOf(':') >= 0) || !names.Add(name))
-                    throw new InvalidDataException($"Ruta no permitida dentro del paquete: '{name}'.");
+                    throw new InvalidDataException($"Path not allowed inside the package: '{name}'.");
                 if (!string.Equals(name, ManifestName, StringComparison.Ordinal)
                     && !string.Equals(name, PreviewName, StringComparison.Ordinal))
-                    throw new InvalidDataException($"Entrada desconocida en el paquete: '{name}'.");
+                    throw new InvalidDataException($"Unknown entry in the package: '{name}'.");
                 if (entry.Length > MaxUncompressedBytes)
-                    throw new InvalidDataException("Alguna entrada supera el tamaño descomprimido permitido.");
+                    throw new InvalidDataException("An entry exceeds the allowed uncompressed size.");
                 total += entry.Length;
                 ct.ThrowIfCancellationRequested();
             }
             if (total > MaxUncompressedBytes)
-                throw new InvalidDataException($"El contenido descomprimido supera el límite de {MaxUncompressedBytes / (1024 * 1024)} MB.");
+                throw new InvalidDataException($"The uncompressed content exceeds the {MaxUncompressedBytes / (1024 * 1024)} MB limit.");
         }
 
-        // El bloque using anterior solo validaba; se reabre para la lectura real.
+        // The using block above only validated; it is reopened for the actual read.
         ms.Position = 0;
         return new ZipArchive(ms, ZipArchiveMode.Read, leaveOpen: true);
     }
@@ -184,7 +184,7 @@ public static class GlowPackageService
             {
                 read += n;
                 if (read > cap)
-                    throw new InvalidDataException($"'{label}' supera el tamaño máximo permitido.");
+                    throw new InvalidDataException($"'{label}' exceeds the maximum allowed size.");
                 buffer.Write(chunk, 0, n);
             }
         }
@@ -319,7 +319,7 @@ public static class GlowPackageService
         try { doc = JsonDocument.Parse(json, ExternalHttp.JsonOptions); }
         catch (JsonException ex)
         {
-            throw new InvalidDataException("El manifiesto no es JSON válido.", ex);
+            throw new InvalidDataException("The manifest is not valid JSON.", ex);
         }
 
         using (doc)
@@ -329,16 +329,16 @@ public static class GlowPackageService
             var format = GetRequiredString(root, "format");
             if (!string.Equals(format, FormatId, StringComparison.Ordinal) &&
                 !string.Equals(format, LegacyMigration.FormerGlowFormatId, StringComparison.Ordinal))
-                throw new InvalidDataException($"Formato no reconocido: '{format}'.");
+                throw new InvalidDataException($"Unrecognized format: '{format}'.");
 
             var schema = GetRequiredInt(root, "schemaVersion");
             if (schema != SchemaVersion)
-                throw new InvalidDataException($"schemaVersion {schema} no soportada (se esperaba {SchemaVersion}).");
+                throw new InvalidDataException($"schemaVersion {schema} is not supported (expected {SchemaVersion}).");
 
             _ = GetRequiredString(root, "exportedAt");
 
             if (!root.TryGetProperty("profile", out var profileElement))
-                throw new InvalidDataException("El manifiesto carece del objeto obligatorio 'profile'.");
+                throw new InvalidDataException("The manifest is missing the required 'profile' object.");
             var p = RequireObject(profileElement, "profile");
             var profile = new DesignProfile
             {
@@ -441,7 +441,7 @@ public static class GlowPackageService
     static JsonElement RequireObject(JsonElement el, string name)
     {
         if (el.ValueKind != JsonValueKind.Object)
-            throw new InvalidDataException($"'{name}' debe ser un objeto JSON.");
+            throw new InvalidDataException($"'{name}' must be a JSON object.");
         return el;
     }
 
@@ -458,7 +458,7 @@ public static class GlowPackageService
     static string GetRequiredString(JsonElement parent, string name)
     {
         if (!parent.TryGetProperty(name, out var el) || el.ValueKind != JsonValueKind.String)
-            throw new InvalidDataException($"El manifiesto carece del campo obligatorio '{name}'.");
+            throw new InvalidDataException($"The manifest is missing the required field '{name}'.");
         return el.GetString()!;
     }
 
@@ -466,7 +466,7 @@ public static class GlowPackageService
     {
         if (!parent.TryGetProperty(name, out var el) || el.ValueKind != JsonValueKind.Number
             || !el.TryGetInt32(out var v))
-            throw new InvalidDataException($"El campo '{name}' debe ser un entero.");
+            throw new InvalidDataException($"The field '{name}' must be an integer.");
         return v;
     }
 
@@ -483,7 +483,7 @@ public static class GlowPackageService
         {
             JsonValueKind.True => true,
             JsonValueKind.False => false,
-            _ => throw new InvalidDataException($"El campo '{name}' debe ser booleano."),
+            _ => throw new InvalidDataException($"The field '{name}' must be a boolean."),
         };
     }
 
@@ -491,9 +491,9 @@ public static class GlowPackageService
     {
         if (!parent.TryGetProperty(name, out var el)) return fallback;
         if (el.ValueKind != JsonValueKind.Number || !el.TryGetDouble(out var v) || !double.IsFinite(v))
-            throw new InvalidDataException($"El campo '{name}' debe ser un número finito.");
+            throw new InvalidDataException($"The field '{name}' must be a finite number.");
         if (v < min || v > max)
-            throw new InvalidDataException($"El campo '{name}' está fuera del rango [{min}, {max}] (valor: {v.ToString(CultureInfo.InvariantCulture)}).");
+            throw new InvalidDataException($"The field '{name}' is out of range [{min}, {max}] (value: {v.ToString(CultureInfo.InvariantCulture)}).");
         return v;
     }
 
@@ -501,9 +501,9 @@ public static class GlowPackageService
     {
         if (!parent.TryGetProperty(name, out var el)) return fallback;
         if (el.ValueKind != JsonValueKind.Number || !el.TryGetInt64(out var v))
-            throw new InvalidDataException($"El campo '{name}' debe ser un entero.");
+            throw new InvalidDataException($"The field '{name}' must be an integer.");
         if (v < min || v > max)
-            throw new InvalidDataException($"El campo '{name}' está fuera del rango [{min}, {max}].");
+            throw new InvalidDataException($"The field '{name}' is out of range [{min}, {max}].");
         return v;
     }
 
@@ -513,14 +513,14 @@ public static class GlowPackageService
         if (raw.Length == 0) return fallback;
         if (Enum.TryParse<TEnum>(raw, ignoreCase: false, out var parsed) && Enum.IsDefined(parsed))
             return parsed;
-        throw new InvalidDataException($"Valor de enum desconocido para '{name}': '{raw}'.");
+        throw new InvalidDataException($"Unknown enum value for '{name}': '{raw}'.");
     }
 
     static string GetColor(JsonElement parent, string name, string fallback)
     {
         var value = GetString(parent, name, fallback);
         if (!IsValidHexColor(value))
-            throw new InvalidDataException($"El campo '{name}' no es un color hexadecimal válido: '{value}'.");
+            throw new InvalidDataException($"The field '{name}' is not a valid hex color: '{value}'.");
         return value;
     }
 

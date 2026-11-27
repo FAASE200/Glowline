@@ -155,7 +155,7 @@ public sealed class PulseLogo : FrameworkElement
             double height;
             if (_reactiveActive)
             {
-                // En reposo el logo son cinco puntos; el audio los estira en barras.
+                // At rest the logo is five dots; the audio stretches them into bars.
                 var level = Math.Clamp(_levels[i], 0, 1);
                 var grown = baseHeight * (1 + level * 0.42);
                 height = dotHeight + (grown - dotHeight) * level;

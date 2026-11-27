@@ -26,14 +26,14 @@ public static class LrcParser
         if (string.IsNullOrEmpty(lrc)) return lines;
         if (lrc.Length > MaxInputChars)
         {
-            Log.Write("lrc: entrada excede el límite");
+            Log.Write("lrc: input exceeds the limit");
             return lines;
         }
 
         var rawLines = lrc.Replace("\r", "").Split('\n');
         if (rawLines.Length > MaxLines)
         {
-            Log.Write("lrc: demasiadas líneas");
+            Log.Write("lrc: too many lines");
             return lines;
         }
 
@@ -82,7 +82,7 @@ public static class LrcParser
                     totalWords += parsedWords.Count;
                     if (totalWords > ExternalHttp.MaxLyricWords)
                     {
-                        Log.Write("lrc: demasiadas palabras");
+                        Log.Write("lrc: too many words");
                         return new List<LrcLine>();
                     }
                     if (parsedWords.Count > 0) words = parsedWords;
@@ -93,7 +93,7 @@ public static class LrcParser
             {
                 if (lines.Count >= MaxLines)
                 {
-                    Log.Write("lrc: demasiadas líneas");
+                    Log.Write("lrc: too many lines");
                     return new List<LrcLine>();
                 }
                 lines.Add(new LrcLine { Time = ParseTime(m, offsetMs), Text = text, Words = words });

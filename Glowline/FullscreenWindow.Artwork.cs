@@ -152,18 +152,18 @@ public partial class FullscreenWindow
         _animCts = cts;
         var key = track.Key;
         _animTrackKey = key;
-        Log.Write($"animated UI: buscando artista '{track.Artist}' + álbum '{track.Album}'");
+        Log.Write($"animated UI: looking up artist '{track.Artist}' + album '{track.Album}'");
         try
         {
             var result = await _animated.GetAsync(track, cts.Token);
             if (cts.IsCancellationRequested || _animTrackKey != key || !_isOpen) return;
             if (!result.Available || result.Path is null)
             {
-                Log.Write("animated UI: no disponible (" + (result.ErrorKey ?? "none") + ")");
+                Log.Write("animated UI: unavailable (" + (result.ErrorKey ?? "none") + ")");
                 StopAnimated();
                 return;
             }
-            Log.Write($"animated UI: iniciando {result.Source} {result.Path}");
+            Log.Write($"animated UI: starting {result.Source} {result.Path}");
             StartAnimated(result.Path);
         }
         catch (OperationCanceledException)
@@ -179,7 +179,7 @@ public partial class FullscreenWindow
     void StartAnimated(string path)
     {
         if (!_isOpen || !_settings.Settings.AnimatedCoversEnabled) return;
-        Log.Write("animated UI: cargando MediaElement");
+        Log.Write("animated UI: loading MediaElement");
         var uri = new Uri(path);
         _animatedPlaying = false;
 
@@ -246,7 +246,7 @@ public partial class FullscreenWindow
             ? element.NaturalDuration.TimeSpan.TotalSeconds.ToString("F2")
             : "auto";
         Log.Write($"animated UI: MediaOpened {element.NaturalVideoWidth}x{element.NaturalVideoHeight} " +
-                  $"duración={duration}");
+                  $"duration={duration}");
         _animatedReady = true;
         UpdateLightArtSize(animate: true);
         element.BeginAnimation(OpacityProperty, null);
@@ -267,7 +267,7 @@ public partial class FullscreenWindow
         if (sender is not MediaElement element || !ReferenceEquals(element, ActiveAnimated))
             return;
         if (!_animatedReady) return;
-        Log.Write("animated UI: fin, reiniciando");
+        Log.Write("animated UI: ended, restarting");
         element.Position = TimeSpan.Zero;
         element.Play();
         _animatedPlaying = true;
@@ -444,7 +444,7 @@ public partial class FullscreenWindow
                 (byte)Math.Round((double)sumG / dominantCount),
                 (byte)Math.Round((double)sumB / dominantCount));
 
-            // Fondo fijo = mismo color dominante en todo el marco, no solo en promedio.
+            // Solid background = the same dominant color across the whole frame, not just on average.
             fixedBackground = dominantShare >= 0.85;
             if (fixedBackground)
             {

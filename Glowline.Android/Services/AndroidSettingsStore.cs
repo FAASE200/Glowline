@@ -41,7 +41,7 @@ public sealed class AndroidSettingsStore : IAppSettingsStore
                 }
                 else if (info.Length > MaxSettingsBytes)
                 {
-                    Log.Write("Android settings: archivo excede el límite");
+                    Log.Write("Android settings: file exceeds the size limit");
                 }
             }
         }
