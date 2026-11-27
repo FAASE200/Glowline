@@ -6,10 +6,10 @@ using LyricGlow.Services;
 
 namespace LyricGlow;
 
-// Ajustes de la sección "Extras" (0.9.40) y de la romanización.
+// Settings for the "Extras" section (0.9.40) and romanization.
 public partial class MainWindow
 {
-    /// <summary>Refleja en la UI el estado actual de los extras.</summary>
+    /// <summary>Shows the current state of the extras in the UI.</summary>
     public void RefreshExtrasUi()
     {
         var s = _settings.Settings;

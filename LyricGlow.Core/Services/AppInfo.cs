@@ -4,9 +4,9 @@ using System.Reflection;
 namespace LyricGlow.Services;
 
 /// <summary>
-/// Identidad pública de la app que se envía a los servicios externos.
-/// LRCLIB y otros proveedores piden un User-Agent con nombre, versión y
-/// una URL de contacto; así se distingue Glowline de tráfico anónimo.
+/// Public identity of the app sent to external services.
+/// LRCLIB and other providers ask for a User-Agent with a name, version and
+/// contact URL, so Glowline can be told apart from anonymous traffic.
 /// </summary>
 public static class AppInfo
 {
@@ -21,8 +21,8 @@ public static class AppInfo
 
     static Version ResolveVersion()
     {
-        // La app (WPF o Android) es la que lleva la versión real; Core puede
-        // tener otra, así que se prefiere el ensamblado de entrada.
+        // The app (WPF or Android) carries the real version; Core may have a
+        // different one, so the entry assembly is preferred.
         var version = Assembly.GetEntryAssembly()?.GetName().Version
                       ?? typeof(AppInfo).Assembly.GetName().Version
                       ?? new Version(0, 0, 0);

@@ -1546,7 +1546,7 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Muestra un aviso de Windows desde el ícono de la bandeja.</summary>
+    /// <summary>Shows a Windows notification from the tray icon.</summary>
     public void ShowNotice(string text)
     {
         try

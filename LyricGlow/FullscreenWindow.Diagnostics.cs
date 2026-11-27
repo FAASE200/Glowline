@@ -21,7 +21,7 @@ using LyricGlow.Services;
 
 namespace LyricGlow;
 
-// Utilidades de depuración usadas por SelfTest y las capturas automáticas.
+// Debug helpers used by SelfTest and automated snapshots.
 public partial class FullscreenWindow
 {
     public void DebugSetAnimatedReady(bool ready)

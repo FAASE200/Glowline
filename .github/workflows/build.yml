@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   windows:
-    name: Windows (WPF + pruebas)
+    name: Windows (WPF + tests)
     runs-on: windows-latest
     env:
       DOTNET_NOLOGO: true
@@ -27,13 +27,13 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Pruebas de LyricGlow.Core
+      - name: Test LyricGlow.Core
         run: dotnet run --project LyricGlow.Core.Tests/LyricGlow.Core.Tests.csproj -c Release
 
-      - name: Compilar la app de Windows
+      - name: Build the Windows app
         run: dotnet build LyricGlow/LyricGlow.csproj -c Release
 
-      - name: Publicar build portable
+      - name: Publish portable build
         if: github.event_name == 'push'
         run: >
           dotnet publish LyricGlow/LyricGlow.csproj -c Release -r win-x64
@@ -41,7 +41,7 @@ jobs:
           -p:EnableCompressionInSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true -o publish
 
-      - name: Subir artefacto
+      - name: Upload artifact
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:

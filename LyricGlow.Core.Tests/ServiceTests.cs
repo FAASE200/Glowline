@@ -84,11 +84,11 @@ static class LyricsServiceTests
     [Test]
     static void PickBestPrefersMatchingDuration()
     {
-        var track = new TrackInfo { Title = "Canción", Artist = "Artista", DurationSeconds = 200 };
+        var track = new TrackInfo { Title = "Song", Artist = "Artist", DurationSeconds = 200 };
         var best = LyricsService.PickBest(new List<LrclibTrack>
         {
-            Result(1, "Canción", "Artista", 260, synced: true),
-            Result(2, "Canción", "Artista", 200.4, synced: true),
+            Result(1, "Song", "Artist", 260, synced: true),
+            Result(2, "Song", "Artist", 200.4, synced: true),
         }, track);
         Assert.Equal(2L, Assert.NotNull(best).Id);
     }
@@ -96,11 +96,11 @@ static class LyricsServiceTests
     [Test]
     static void PickBestPrefersSyncedOverPlain()
     {
-        var track = new TrackInfo { Title = "Canción", Artist = "Artista", DurationSeconds = 200 };
+        var track = new TrackInfo { Title = "Song", Artist = "Artist", DurationSeconds = 200 };
         var best = LyricsService.PickBest(new List<LrclibTrack>
         {
-            Result(1, "Canción", "Artista", 200, synced: false),
-            Result(2, "Canción", "Artista", 201, synced: true),
+            Result(1, "Song", "Artist", 200, synced: false),
+            Result(2, "Song", "Artist", 201, synced: true),
         }, track);
         Assert.Equal(2L, Assert.NotNull(best).Id);
     }
@@ -195,7 +195,7 @@ static class TimelineSmootherTests
         var t0 = DateTimeOffset.UnixEpoch;
         smoother.Update(10, playing: true, t0, t0, "a");
         smoother.NotifySeek(60, t0);
-        // El reproductor todavía informa la posición vieja: se ignora.
+        // The player still reports the old position: it is ignored.
         Assert.Near(60.5, smoother.Update(10.5, playing: true, t0, t0.AddSeconds(0.5), "a"));
     }
 }

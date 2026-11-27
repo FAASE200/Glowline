@@ -9,10 +9,10 @@ using System.Threading.Tasks;
 namespace LyricGlow.Services;
 
 /// <summary>
-/// Servidor web mínimo para usar la letra como "Fuente de navegador" en OBS.
-/// Solo escucha en 127.0.0.1 (no es accesible desde otros equipos), solo
-/// responde GET y rechaza cualquier Host que no sea localhost, para que una
-/// página web externa no pueda leerlo con trucos de DNS.
+/// Minimal web server to use the lyrics as a "Browser" source in OBS.
+/// It only listens on 127.0.0.1 (not reachable from other computers), only
+/// answers GET and rejects any Host other than localhost, so an outside
+/// web page can't read it through DNS rebinding.
 /// </summary>
 public sealed class OverlayServer : IDisposable
 {
@@ -57,13 +57,13 @@ public sealed class OverlayServer : IDisposable
             LastError = null;
             _cts = new CancellationTokenSource();
             _ = AcceptLoopAsync(listener, _cts.Token);
-            Log.Write($"overlay: escuchando en {Url}");
+            Log.Write($"overlay: listening on {Url}");
         }
         catch (Exception ex)
         {
             _listener = null;
             LastError = ex.Message;
-            Log.Write($"overlay: no se pudo abrir el puerto {port}: {ex.Message}");
+            Log.Write($"overlay: could not open port {port}: {ex.Message}");
         }
     }
 
@@ -137,7 +137,7 @@ public sealed class OverlayServer : IDisposable
             }
             catch
             {
-                // Conexiones cortadas o lentas: no hay nada que hacer.
+                // Dropped or slow connections: nothing to do.
             }
         }
     }

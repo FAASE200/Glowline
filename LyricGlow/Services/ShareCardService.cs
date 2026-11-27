@@ -11,9 +11,9 @@ using LyricGlow.Models;
 namespace LyricGlow.Services;
 
 /// <summary>
-/// Genera una tarjeta para compartir una línea de la canción (portada,
-/// colores de la portada, la frase y el título) en formato vertical 4:5,
-/// que es el que mejor se ve en Instagram y TikTok.
+/// Creates a card to share a line of the song (cover, cover colors, the
+/// line and the title) in a vertical 4:5 format, which looks best on
+/// Instagram and TikTok.
 /// </summary>
 public static class ShareCardService
 {
@@ -24,8 +24,8 @@ public static class ShareCardService
         Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Glowline");
 
     /// <summary>
-    /// Dibuja la tarjeta, la guarda como PNG en Imágenes\Glowline y la copia
-    /// al portapapeles. Devuelve la ruta del archivo.
+    /// Draws the card, saves it as a PNG in Pictures\Glowline and copies it
+    /// to the clipboard. Returns the file path.
     /// </summary>
     public static string CreateAndSave(LrcLine line, TrackInfo track, byte[]? artBytes, Color accent)
     {
@@ -45,7 +45,7 @@ public static class ShareCardService
         }
         catch (Exception ex)
         {
-            // Otra app puede tener el portapapeles abierto: el PNG ya quedó guardado.
+            // Another app may have the clipboard open: the PNG is already saved.
             Log.Write("share clipboard: " + ex.Message);
         }
 
@@ -58,7 +58,7 @@ public static class ShareCardService
         var cover = Decode(artBytes);
         var root = new Grid { Width = Width, Height = Height, ClipToBounds = true };
 
-        // Fondo: la portada ampliada y desenfocada, o un degradado del color de acento.
+        // Background: the enlarged, blurred cover, or a gradient of the accent color.
         if (cover is not null)
         {
             root.Children.Add(new Image
@@ -85,7 +85,7 @@ public static class ShareCardService
         content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.Children.Add(content);
 
-        // Cabecera: portada + título y artista.
+        // Header: cover + title and artist.
         var header = new DockPanel { LastChildFill = true };
         if (cover is not null)
         {
@@ -107,7 +107,7 @@ public static class ShareCardService
         header.Children.Add(titles);
         content.Children.Add(header);
 
-        // La frase.
+        // The line.
         var quote = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         var lineText = string.IsNullOrWhiteSpace(line.Text) ? line.Background : line.Text;
         var size = lineText.Length switch
@@ -133,7 +133,7 @@ public static class ShareCardService
         Grid.SetRow(quote, 1);
         content.Children.Add(quote);
 
-        // Firma.
+        // Signature.
         var footer = new StackPanel { Orientation = Orientation.Horizontal };
         for (var i = 0; i < 5; i++)
         {

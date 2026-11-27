@@ -10,17 +10,17 @@ using System.Threading.Tasks;
 namespace LyricGlow.Services;
 
 /// <summary>
-/// Muestra en tu perfil de Discord la canción que suena ("Escuchando ...").
-/// Habla con la app de Discord del mismo equipo por su tubería local
-/// (discord-ipc-N); no usa internet ni pide iniciar sesión.
-/// Discord limita los cambios de estado, así que solo se envía la canción,
-/// el artista y el tiempo, no cada línea.
+/// Shows the song that's playing on your Discord profile ("Listening to ...").
+/// Talks to the Discord app on the same computer through its local pipe
+/// (discord-ipc-N); it doesn't use the internet or ask you to sign in.
+/// Discord rate-limits status changes, so only the song, artist and time
+/// are sent, not every line.
 /// </summary>
 public sealed class DiscordPresence : IDisposable
 {
     /// <summary>
-    /// Id de la aplicación "Glowline" en el portal de desarrolladores de
-    /// Discord. No es secreto. Vacío = función no disponible.
+    /// Id of the "Glowline" application in the Discord developer portal.
+    /// It is not a secret. Empty = feature unavailable.
     /// </summary>
     public const string ClientId = "";
 
@@ -56,8 +56,8 @@ public sealed class DiscordPresence : IDisposable
     {
         try
         {
-            // Discord acepta como mucho ~5 cambios cada 20 s: se espera entre envíos
-            // y solo se manda el último estado pendiente.
+            // Discord accepts at most ~5 updates every 20 s: wait between sends
+            // and only send the latest pending state.
             var wait = TimeSpan.FromSeconds(4) - (DateTime.UtcNow - _lastSent);
             if (wait > TimeSpan.Zero) await Task.Delay(wait).ConfigureAwait(false);
             var snapshot = Interlocked.Exchange(ref _pending, null);
@@ -93,7 +93,7 @@ public sealed class DiscordPresence : IDisposable
                 long? end = s.Duration is > 0 ? (start + TimeSpan.FromSeconds(s.Duration.Value)).ToUnixTimeMilliseconds() : null;
                 activity = new
                 {
-                    type = 2, // "Escuchando"
+                    type = 2, // "Listening to"
                     details = Clip(s.Title),
                     state = Clip(s.Artist.Length > 0 ? s.Artist : "Glowline"),
                     timestamps = end is null
@@ -133,7 +133,7 @@ public sealed class DiscordPresence : IDisposable
                 await WriteFrameAsync(0, new { v = 1, client_id = ClientId }).ConfigureAwait(false);
                 await ReadFrameAsync().ConfigureAwait(false); // READY
                 _ = Task.Run(DrainAsync);
-                Log.Write("discord: conectado a discord-ipc-" + i);
+                Log.Write("discord: connected to discord-ipc-" + i);
                 return true;
             }
             catch
@@ -145,8 +145,8 @@ public sealed class DiscordPresence : IDisposable
         return false;
     }
 
-    // Discord responde a cada comando; hay que leer las respuestas para que
-    // la tubería no se llene.
+    // Discord replies to every command; the replies must be read so the
+    // pipe doesn't fill up.
     async Task DrainAsync()
     {
         try
@@ -160,7 +160,7 @@ public sealed class DiscordPresence : IDisposable
 
     async Task WriteFrameAsync(int opcode, object payload)
     {
-        var pipe = _pipe ?? throw new IOException("Discord no está conectado.");
+        var pipe = _pipe ?? throw new IOException("Discord is not connected.");
         var body = JsonSerializer.SerializeToUtf8Bytes(payload);
         var header = new byte[8];
         BinaryPrimitives.WriteInt32LittleEndian(header, opcode);
@@ -172,15 +172,15 @@ public sealed class DiscordPresence : IDisposable
 
     async Task ReadFrameAsync()
     {
-        var pipe = _pipe ?? throw new IOException("Discord no está conectado.");
+        var pipe = _pipe ?? throw new IOException("Discord is not connected.");
         var header = new byte[8];
         await pipe.ReadExactlyAsync(header).ConfigureAwait(false);
         var length = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(4));
-        if (length is < 0 or > 64 * 1024) throw new InvalidDataException("Respuesta de Discord no válida.");
+        if (length is < 0 or > 64 * 1024) throw new InvalidDataException("Invalid response from Discord.");
         var body = new byte[length];
         await pipe.ReadExactlyAsync(body).ConfigureAwait(false);
         var opcode = BinaryPrimitives.ReadInt32LittleEndian(header);
-        if (opcode == 2) throw new IOException("Discord cerró la conexión: " + Encoding.UTF8.GetString(body));
+        if (opcode == 2) throw new IOException("Discord closed the connection: " + Encoding.UTF8.GetString(body));
     }
 
     async Task ClearAndCloseAsync()

@@ -57,8 +57,8 @@ public sealed class LyricsService
 
     CancellationTokenSource? _cts;
 
-    // Null-safe: un ajuste guardado a mano con "null" no debe romper la app
-    // (Android carga los ajustes sin la normalización de Windows).
+    // Null-safe: a hand-edited setting saved as "null" must not crash the app
+    // (Android loads settings without the Windows normalization).
     Dictionary<string, Dictionary<string, int>> LineOffsets =>
         _settings.Settings.PerLineOffsetMs ??= new Dictionary<string, Dictionary<string, int>>();
 
@@ -167,7 +167,7 @@ public sealed class LyricsService
                     Apply(track, pinned, null);
                     return;
                 }
-                // El archivo de la letra fijada desapareció: se vuelve a la búsqueda normal.
+                // The pinned lyrics file is gone: fall back to the normal lookup.
                 ManualPins.Remove(key);
                 _settings.ScheduleSave();
             }
@@ -202,9 +202,9 @@ public sealed class LyricsService
         generation == _resolveGeneration && !cts.IsCancellationRequested;
 
     /// <summary>
-    /// Busca en la fuente preferida, luego en la otra fuente con sincronía por
-    /// palabra y, por último, en LRCLIB. Devuelve la letra y la nota que la UI
-    /// muestra cuando se usó un respaldo.
+    /// Looks in the preferred source, then in the other word-synced source and
+    /// finally in LRCLIB. Returns the lyrics and the note the UI shows when a
+    /// fallback was used.
     /// </summary>
     async Task<(LrclibTrack? Found, string? Note)> ResolveWithFallbackAsync(
         TrackInfo track, LyricSource primary, LyricSource backup, bool ignoreCache, CancellationToken ct)
@@ -215,7 +215,7 @@ public sealed class LyricsService
 
         var cacheKey = AlbumCacheKey(primary, key, track.Album);
         var found = ignoreCache ? null : LoadCache(cacheKey);
-        // Las letras de Lrcmux guardadas antes de distinguir el álbum siguen valiendo.
+        // Lrcmux lyrics cached before the album was part of the key are still valid.
         if (!ignoreCache && found is null && primary == LyricSource.Lrcmux)
             found = LoadCache(CacheKey(primary, key));
         if (!HasUsableSync(found))
@@ -225,7 +225,7 @@ public sealed class LyricsService
         }
 
         Log.Write(found is null
-            ? $"resolve[{primaryName}] '{track.DisplayName}' dur={duration} -> sin resultados"
+            ? $"resolve[{primaryName}] '{track.DisplayName}' dur={duration} -> no results"
             : $"resolve[{primaryName}] '{track.DisplayName}' dur={duration} -> '{found.TrackName}' / '{found.ArtistName}' ({found.Duration?.ToString("F0") ?? "?"}s, word={found.HasWordSync}, via={found.Source})");
 
         if (HasUsableSync(found))
@@ -237,7 +237,7 @@ public sealed class LyricsService
         if (found?.Instrumental == true) return (found, null);
 
         var backupNote = "LyricsNoteBackup" + SourceName(backup);
-        Log.Write($"resolve[{primaryName}] '{track.DisplayName}' -> respaldo {SourceName(backup)}");
+        Log.Write($"resolve[{primaryName}] '{track.DisplayName}' -> fallback {SourceName(backup)}");
         var backupKey = AlbumCacheKey(backup, key, track.Album);
         var fallback = ignoreCache ? null : LoadCache(backupKey);
         if (!HasUsableSync(fallback))
@@ -592,10 +592,10 @@ public sealed class LyricsService
     }
 
     // ------------------------------------------------------------------
-    // Ajuste fino por línea y romanización
+    // Per-line timing and romanization
     // ------------------------------------------------------------------
 
-    /// <summary>Límite del ajuste de una línea (±5 s).</summary>
+    /// <summary>Limit for a single line adjustment (±5 s).</summary>
     public const int MaxLineOffsetMs = 5000;
 
     static string LineId(LrcLine line)
@@ -646,8 +646,8 @@ public sealed class LyricsService
     }
 
     /// <summary>
-    /// Vuelve a calcular las líneas visibles (ajustes por línea, romanización)
-    /// sin volver a descargar la letra.
+    /// Rebuilds the visible lines (per-line timing, romanization) without
+    /// downloading the lyrics again.
     /// </summary>
     public void RefreshDisplayLines()
     {
@@ -673,8 +673,8 @@ public sealed class LyricsService
             var shiftMs = offsets is not null && offsets.TryGetValue(LineId(line), out var value) ? value : 0;
             var baseTime = double.IsNaN(line.SourceTime) ? line.Time : line.SourceTime;
             var time = baseTime + shiftMs / 1000.0;
-            // Una línea ajustada no puede adelantar a la anterior ni pasar a la
-            // siguiente: el índice por búsqueda binaria necesita el orden.
+            // An adjusted line can't move before the previous one or past the
+            // next one: the binary-search index relies on the order.
             var lower = i > 0 ? result[i - 1].Time + 0.01 : 0;
             var next = i + 1 < source.Count ? source[i + 1] : null;
             var upper = next is null
@@ -759,9 +759,9 @@ public sealed class LyricsService
     }
 
     /// <summary>
-    /// Búsqueda manual en las tres fuentes. LRCLIB busca por texto libre;
-    /// Lrcmux y LyricsPlus necesitan título y artista, que se toman de la
-    /// consulta ("Artista - Título") o del artista de la canción actual.
+    /// Manual search across the three sources. LRCLIB takes free text;
+    /// Lrcmux and LyricsPlus need a title and artist, taken from the query
+    /// ("Artist - Title") or from the artist of the current track.
     /// </summary>
     public async Task<List<LrclibTrack>> SearchManualAsync(string query, CancellationToken ct)
     {
@@ -833,8 +833,8 @@ public sealed class LyricsService
         var key = Track.Key;
         if (result.Provider is "Lrcmux" or "LyricsPlus")
         {
-            // Las letras de Lrcmux y LyricsPlus no tienen un id estable: se
-            // guarda una copia fija que no caduca con la caché.
+            // Lrcmux and LyricsPlus lyrics have no stable id, so a pinned copy
+            // is stored that does not expire with the cache.
             _settings.Settings.ManualOverrides.Remove(key);
             ManualPins[key] = result.Provider;
             SavePinned(key, result);
@@ -905,8 +905,8 @@ public sealed class LyricsService
             if (json.Length > MaxCacheBytes) return;
             var path = CachePath(key);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            // Escritura atómica: si la app se cierra a mitad, no queda un JSON
-            // truncado que obligue a descargar de nuevo la letra.
+            // Atomic write: if the app closes halfway, no truncated JSON is left
+            // behind that would force the lyrics to be downloaded again.
             var temp = path + ".tmp";
             File.WriteAllText(temp, json);
             File.Move(temp, path, overwrite: true);
@@ -922,8 +922,8 @@ public sealed class LyricsService
     static readonly TimeSpan CacheLifetime = TimeSpan.FromDays(14);
     static int _savesSincePrune = int.MaxValue / 2;
 
-    // La cache de letras crecía sin límite. Cada cierto número de escrituras
-    // se borran las entradas caducadas y, si sobran, las más antiguas.
+    // The lyrics cache used to grow forever. Every so many writes, expired
+    // entries are removed and, if there are too many, the oldest ones.
     static void PruneCacheOccasionally()
     {
         if (Interlocked.Increment(ref _savesSincePrune) < 50) return;
@@ -966,7 +966,7 @@ public sealed class LyricsService
             Log.Write("cache prune: " + ex.Message);
         }
 
-        if (removed > 0) Log.Write($"cache prune: {removed} letras antiguas eliminadas");
+        if (removed > 0) Log.Write($"cache prune: removed {removed} old lyrics");
         return removed;
     }
 

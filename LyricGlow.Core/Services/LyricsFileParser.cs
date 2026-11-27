@@ -143,9 +143,9 @@ public static class LyricsFileParser
         return value;
     }
 
-    // YAML permite secuencias de escape en cadenas con comillas dobles
-    // (\u00e9, \n, \\...). Antes solo se resolvía \" y las tildes o emojis
-    // escapados aparecían tal cual en pantalla.
+    // YAML allows escape sequences in double-quoted strings
+    // (\u00e9, \n, \\...). Previously only \" was handled, so escaped accents
+    // and emoji showed up literally on screen.
     internal static string UnescapeDoubleQuoted(string text)
     {
         if (text.IndexOf('\\') < 0) return text;

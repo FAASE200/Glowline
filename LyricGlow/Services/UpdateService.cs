@@ -91,9 +91,9 @@ public sealed class UpdateService
         });
     }
 
-    // Cada actualización deja su instalador (decenas de MB) en la carpeta de
-    // actualizaciones. Al arrancar se borran los de versiones ya instaladas y
-    // las descargas a medias que quedaron de sesiones anteriores.
+    // Every update leaves its installer (tens of MB) in the updates folder.
+    // On startup, installers for versions already installed are removed,
+    // along with partial downloads left over from earlier sessions.
     void CleanupOldDownloads()
     {
         try
@@ -115,7 +115,7 @@ public sealed class UpdateService
                 try
                 {
                     file.Delete();
-                    Log.Write($"update: limpieza de {file.Name}");
+                    Log.Write($"update: removed {file.Name}");
                 }
                 catch
                 {

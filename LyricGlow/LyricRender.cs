@@ -19,8 +19,8 @@ public static class LyricRender
     }
 
     /// <summary>
-    /// Agrega debajo de la línea su pronunciación en letras latinas
-    /// (romanización local), en cursiva y más pequeña.
+    /// Appends the line's pronunciation in Latin letters (local
+    /// romanization) below it, in smaller italic text.
     /// </summary>
     public static void AppendRomanized(TextBlock block, LrcLine line, Color color, double scale = 0.5)
     {

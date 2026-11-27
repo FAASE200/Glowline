@@ -1,8 +1,8 @@
 namespace LyricGlow.Services;
 
 /// <summary>
-/// Página que OBS muestra como "Fuente de navegador". Fondo transparente;
-/// se personaliza con parámetros en la URL, por ejemplo:
+/// Page that OBS shows as a "Browser" source. Transparent background;
+/// customized with URL parameters, for example:
 /// http://localhost:7531/?size=56&amp;align=left&amp;cover=0&amp;next=0
 /// </summary>
 static class OverlayPage
@@ -98,7 +98,7 @@ static class OverlayPage
       el("roman").classList.toggle("hidden", !s.romanized);
       setText(el("next"), showNext ? (s.next || "") : "");
     } catch (e) {
-      // Glowline cerrado: se reintenta en silencio.
+      // Glowline is closed: retry silently.
     }
     setTimeout(poll, 150);
   }

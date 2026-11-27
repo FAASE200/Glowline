@@ -16,8 +16,8 @@ public sealed class TrackInfo
 
     string? _key;
 
-    // Se calcula una sola vez: la vista a pantalla completa la consulta en
-    // cada frame (offset por canción) y normalizar con regex tiene coste.
+    // Computed once: the full-screen view reads it every frame (per-track
+    // offset) and normalizing it with a regex is not free.
     public string Key => _key ??= TrackKey.Make(Artist, Title, DurationSeconds);
 
     public string DisplayName => Artist.Length > 0 ? $"{Artist} — {Title}" : Title;
@@ -50,9 +50,9 @@ public sealed class LrcLine
     public string Background { get; init; } = "";
     public IReadOnlyList<LrcWord>? Words { get; init; }
     public IReadOnlyList<LrcWord>? BackgroundWords { get; init; }
-    /// <summary>Pronunciación en letras latinas (vacía si no aplica).</summary>
+    /// <summary>Pronunciation in Latin letters (empty when not applicable).</summary>
     public string Romanized { get; init; } = "";
-    /// <summary>Tiempo original de la fuente, antes de ajustes por línea.</summary>
+    /// <summary>Original time from the source, before per-line adjustments.</summary>
     public double SourceTime { get; init; } = double.NaN;
 }
 
@@ -75,7 +75,7 @@ public sealed class LrclibTrack
     [JsonPropertyName("syncedLyrics")] public string? SyncedLyrics { get; set; }
     [JsonPropertyName("lyricsfile")] public string? LyricsFile { get; set; }
     public string Source { get; set; } = "LRCLIB";
-    /// <summary>Servicio que entregó la letra (LRCLIB, Lrcmux o LyricsPlus).</summary>
+    /// <summary>Service that provided the lyrics (LRCLIB, Lrcmux or LyricsPlus).</summary>
     [JsonPropertyName("provider")] public string Provider { get; set; } = "";
 
     [JsonIgnore] public bool HasSynced => !string.IsNullOrWhiteSpace(SyncedLyrics);
@@ -141,9 +141,9 @@ public sealed class AppSettings
     public int MobilePresetIndex { get; set; } = 1;
 
     // ---- 0.9.40 ----
-    /// <summary>Ajuste fino por línea: canción → (tiempo original en ms → desfase en ms).</summary>
+    /// <summary>Per-line timing: track → (original time in ms → offset in ms).</summary>
     public Dictionary<string, Dictionary<string, int>> PerLineOffsetMs { get; set; } = new();
-    /// <summary>Letras elegidas a mano desde Lrcmux o LyricsPlus (canción → proveedor).</summary>
+    /// <summary>Lyrics picked by hand from Lrcmux or LyricsPlus (track → provider).</summary>
     public Dictionary<string, string> ManualPins { get; set; } = new();
     public bool RomanizationEnabled { get; set; }
     public bool MiniLyricsEnabled { get; set; }

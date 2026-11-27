@@ -46,7 +46,7 @@ static class DisplayLineTests
     {
         var offsets = new Dictionary<string, int> { ["10000"] = 300 };
         var adjusted = LyricsService.BuildDisplayLines(Source(), offsets, romanize: false);
-        // Volver a construir desde las líneas ya ajustadas no debe acumular el desfase.
+        // Rebuilding from already-adjusted lines must not stack the offset.
         var again = LyricsService.BuildDisplayLines(adjusted, offsets, romanize: false);
         Assert.Near(10.3, again[0].Time, 1e-9);
     }

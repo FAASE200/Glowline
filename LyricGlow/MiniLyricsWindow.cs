@@ -15,9 +15,9 @@ using LyricGlow.Services;
 namespace LyricGlow;
 
 /// <summary>
-/// Ventanita flotante, siempre encima, con la línea actual y la siguiente.
-/// Pensada para usar mientras se juega, se programa o se ve otra cosa sin
-/// abrir la pantalla completa. No roba el foco ni aparece en Alt+Tab.
+/// Small floating always-on-top window with the current and next line.
+/// Meant for gaming, coding or watching something else without opening
+/// the full-screen view. It doesn't steal focus or show up in Alt+Tab.
 /// </summary>
 public sealed class MiniLyricsWindow : Window
 {
@@ -34,7 +34,7 @@ public sealed class MiniLyricsWindow : Window
     string _trackKey = "";
     IReadOnlyList<LrcLine>? _lines;
 
-    /// <summary>Muestra u oculta la mini-letra según el ajuste guardado.</summary>
+    /// <summary>Shows or hides the mini lyrics according to the saved setting.</summary>
     public static void Sync()
     {
         var enabled = App.Settings.Settings.MiniLyricsEnabled && !App.SnapshotMode;
@@ -70,8 +70,8 @@ public sealed class MiniLyricsWindow : Window
         ResizeMode = ResizeMode.NoResize;
         SizeToContent = SizeToContent.Height;
         Width = 560;
-        // Posición inicial aproximada para que no aparezca un instante en la esquina
-        // superior izquierda; al cargar se ajusta con el alto real.
+        // Approximate initial position so it doesn't flash in the top-left
+        // corner; it is adjusted with the real height once loaded.
         WindowStartupLocation = WindowStartupLocation.Manual;
         var area = SystemParameters.WorkArea;
         Left = App.Settings.Settings.MiniLyricsLeft ?? area.Right - Width - 24;
@@ -175,7 +175,7 @@ public sealed class MiniLyricsWindow : Window
         var lyrics = App.Lyrics;
         var track = lyrics.Track;
 
-        // Con la pantalla completa abierta, la mini-letra solo estorba.
+        // With the full-screen view in front, the mini lyrics only get in the way.
         var hidden = App.Primary?.IsShowingFullscreen == true || track is null;
         var visibility = hidden ? Visibility.Hidden : Visibility.Visible;
         if (Visibility != visibility) Visibility = visibility;
@@ -257,7 +257,7 @@ public sealed class MiniLyricsWindow : Window
         var area = SystemParameters.WorkArea;
         var left = settings.MiniLyricsLeft ?? area.Right - Width - 24;
         var top = settings.MiniLyricsTop ?? area.Bottom - ActualHeight - 24;
-        // Si la pantalla cambió y la posición guardada quedó fuera, se vuelve a la esquina.
+        // If the screens changed and the saved position is off-screen, go back to the corner.
         var virtualLeft = SystemParameters.VirtualScreenLeft;
         var virtualTop = SystemParameters.VirtualScreenTop;
         if (left < virtualLeft || left > virtualLeft + SystemParameters.VirtualScreenWidth - 80 ||
@@ -281,7 +281,7 @@ public sealed class MiniLyricsWindow : Window
     {
         var handle = new WindowInteropHelper(this).Handle;
         var style = GetWindowLong(handle, GwlExStyle);
-        // Sin botón en la barra de tareas ni en Alt+Tab.
+        // No taskbar button and no Alt+Tab entry.
         SetWindowLong(handle, GwlExStyle, style | WsExToolWindow);
     }
 

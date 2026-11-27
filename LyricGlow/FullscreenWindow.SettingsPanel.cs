@@ -21,7 +21,7 @@ using LyricGlow.Services;
 
 namespace LyricGlow;
 
-// Panel de ajustes rápidos, tema de interfaz y paleta.
+// Quick settings panel, interface theme and palette.
 public partial class FullscreenWindow
 {
     void ToggleSettingsPanel()

@@ -244,8 +244,8 @@ public partial class App : Application
         StartExtras();
     }
 
-    // Funciones de la 0.9.40: atajos globales, mini-letra, OBS y Discord.
-    // Cada una falla por su cuenta sin afectar al resto de la app.
+    // 0.9.40 extras: global shortcuts, mini lyrics, OBS and Discord.
+    // Each one fails on its own without affecting the rest of the app.
     void StartExtras()
     {
         try

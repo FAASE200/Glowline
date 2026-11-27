@@ -21,7 +21,7 @@ using LyricGlow.Services;
 
 namespace LyricGlow;
 
-// Perfil de diseño activo (fondo, portada, tipografía) y apertura para capturas.
+// Active design profile (background, cover, typography) and snapshot opening.
 public partial class FullscreenWindow
 {
     void OnDesignChanged()

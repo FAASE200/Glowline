@@ -8,9 +8,9 @@ static class LrcParserTests
     [Test]
     static void ParsesLinesInOrder()
     {
-        var lines = LrcParser.Parse("[00:12.50]Segunda\n[00:01.00]Primera\n");
+        var lines = LrcParser.Parse("[00:12.50]Second\n[00:01.00]First\n");
         Assert.Equal(2, lines.Count);
-        Assert.Equal("Primera", lines[0].Text);
+        Assert.Equal("First", lines[0].Text);
         Assert.Near(1.0, lines[0].Time);
         Assert.Near(12.5, lines[1].Time);
     }
@@ -48,9 +48,9 @@ static class LrcParserTests
     [Test]
     static void IgnoresMetadataAndEmptyLines()
     {
-        var lines = LrcParser.Parse("[ar:Artista]\n[ti:Título]\n\n[00:05.00]   \n[00:06.00]Hola");
+        var lines = LrcParser.Parse("[ar:Artist]\n[ti:Title]\n\n[00:05.00]   \n[00:06.00]Hello");
         Assert.Equal(1, lines.Count);
-        Assert.Equal("Hola", lines[0].Text);
+        Assert.Equal("Hello", lines[0].Text);
     }
 
     [Test]
@@ -77,14 +77,14 @@ static class LyricsFileParserTests
     const string Sample = """
         version: 1
         lines:
-        - text: 'Primera línea'
+        - text: 'First line'
           start_ms: 1000
           words:
-          - text: 'Primera '
+          - text: 'First '
             start_ms: 1000
-          - text: 'línea'
+          - text: 'line'
             start_ms: 1400
-        - text: "Con \"comillas\" y é"
+        - text: "With \"quotes\" and \u00e9"
           start_ms: 3000
         """;
 
@@ -103,7 +103,7 @@ static class LyricsFileParserTests
     static void UnescapesDoubleQuotedYaml()
     {
         var lines = Assert.NotNull(LyricsFileParser.Parse(Sample));
-        Assert.Equal("Con \"comillas\" y é", lines[1].Text);
+        Assert.Equal("With \"quotes\" and é", lines[1].Text);
     }
 
     [Test]
@@ -138,7 +138,7 @@ static class LyricTextTests
     [Test]
     static void LeavesPlainLinesUntouched()
     {
-        var input = new List<LrcLine> { new() { Time = 1, Text = "Sin paréntesis" } };
+        var input = new List<LrcLine> { new() { Time = 1, Text = "No parentheses" } };
         Assert.True(ReferenceEquals(input, LyricText.Process(input)));
     }
 
@@ -176,8 +176,8 @@ static class TrackKeyTests
     [Test]
     static void KeyIsStableAndRoundsDuration()
     {
-        var track = new TrackInfo { Artist = "Artista", Title = "Canción", DurationSeconds = 199.6 };
-        Assert.Equal("artista|canción|200", track.Key);
+        var track = new TrackInfo { Artist = "Artist", Title = "Canción", DurationSeconds = 199.6 };
+        Assert.Equal("artist|canción|200", track.Key);
         Assert.True(ReferenceEquals(track.Key, track.Key));
         Assert.Equal("a|b|0", new TrackInfo { Artist = "A", Title = "B" }.Key);
     }

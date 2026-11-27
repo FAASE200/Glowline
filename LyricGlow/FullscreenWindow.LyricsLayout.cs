@@ -21,7 +21,7 @@ using LyricGlow.Services;
 
 namespace LyricGlow;
 
-// Construcción, medida y desplazamiento de las líneas de letra.
+// Building, measuring and scrolling the lyric lines.
 public partial class FullscreenWindow
 {
     void RebuildLyrics(bool animate)

@@ -21,7 +21,7 @@ using LyricGlow.Services;
 
 namespace LyricGlow;
 
-// Tema de la vista de letras, cromado y tamaños de portada.
+// Lyrics view theme, chrome and cover sizes.
 public partial class FullscreenWindow
 {
     void ApplyLyricsTheme(bool centered)

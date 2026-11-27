@@ -260,8 +260,8 @@ public sealed class ReleaseClient
         }
         catch
         {
-            // Una descarga cortada o cancelada no debe dejar un .part huérfano
-            // de decenas de MB en la carpeta de actualizaciones.
+            // An interrupted or cancelled download must not leave an orphaned
+            // .part file of tens of MB in the updates folder.
             try { File.Delete(part); } catch { }
             throw;
         }

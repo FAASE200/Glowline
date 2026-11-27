@@ -5,17 +5,17 @@ using System.Text;
 namespace LyricGlow.Services;
 
 /// <summary>
-/// Romanización local (sin red) para mostrar debajo de cada línea cómo se
-/// pronuncia. Cubre coreano (Hangul, romanización revisada simplificada),
-/// japonés escrito en kana (Hepburn) y alfabeto cirílico.
-/// Las líneas japonesas con kanji no se romanizan: sin un diccionario el
-/// resultado sería engañoso, así que se prefiere no mostrar nada.
+/// Local (offline) romanization shown under each line to show how it is
+/// pronounced. Covers Korean (Hangul, simplified Revised Romanization),
+/// Japanese written in kana (Hepburn) and the Cyrillic alphabet.
+/// Japanese lines with kanji are not romanized: without a dictionary the
+/// result would be misleading, so nothing is shown instead.
 /// </summary>
 public static class Romanizer
 {
     /// <summary>
-    /// Devuelve la romanización o una cadena vacía si la línea no tiene
-    /// escritura que se pueda romanizar (o si es japonés con kanji).
+    /// Returns the romanization, or an empty string if the line has no
+    /// script that can be romanized (or is Japanese with kanji).
     /// </summary>
     public static string Romanize(string? text)
     {
@@ -32,7 +32,7 @@ public static class Romanizer
         }
 
         if (!hasHangul && !hasKana && !hasCyrillic) return "";
-        // Japonés con kanji: no hay forma fiable de leerlos sin diccionario.
+        // Japanese with kanji: there is no reliable reading without a dictionary.
         if (hasKana && !hasHangul && ContainsHan(text)) return "";
 
         var sb = new StringBuilder(text.Length * 2);
@@ -91,15 +91,15 @@ public static class Romanizer
         "u", "wo", "we", "wi", "yu", "eu", "ui", "i",
     };
 
-    // Final consonante cuando va antes de otra consonante o al final.
+    // Final consonant before another consonant or at the end of a word.
     static readonly string[] Finals =
     {
         "", "k", "k", "k", "n", "n", "n", "t", "l", "k", "m", "l", "l", "l", "p", "l",
         "m", "p", "p", "t", "t", "ng", "t", "t", "k", "t", "p", "t",
     };
 
-    // Final consonante cuando la sílaba siguiente empieza con ㅇ (enlace):
-    // la consonante pasa a la siguiente sílaba con su sonido inicial.
+    // Final consonant when the next syllable starts with ㅇ (liaison):
+    // the consonant moves to the next syllable with its initial sound.
     static readonly string[] FinalsLinked =
     {
         "", "g", "kk", "ks", "n", "nj", "nh", "d", "r", "lg", "lm", "lb", "ls", "lt", "lp", "lh",
@@ -162,7 +162,7 @@ public static class Romanizer
         };
         foreach (var (kana, romaji) in basic) Add(kana, romaji);
 
-        // Combinaciones con ゃゅょ pequeñas (youon).
+        // Combinations with small ゃゅょ (youon).
         var youonBases = new (string Kana, string Stem)[]
         {
             ("き", "ky"), ("ぎ", "gy"), ("し", "sh"), ("じ", "j"), ("ち", "ch"), ("ぢ", "j"),
@@ -175,7 +175,7 @@ public static class Romanizer
             Add(kana + "ょ", stem + "o");
         }
 
-        // Combinaciones extendidas habituales en katakana (préstamos).
+        // Extended combinations common in katakana (loanwords).
         var extended = new (string Kana, string Romaji)[]
         {
             ("ふぁ", "fa"), ("ふぃ", "fi"), ("ふぇ", "fe"), ("ふぉ", "fo"),
@@ -213,7 +213,7 @@ public static class Romanizer
 
             if (ch == 'ー')
             {
-                // Vocal larga: se repite la última vocal escrita.
+                // Long vowel: repeat the last written vowel.
                 for (var k = sb.Length - 1; k >= 0; k--)
                 {
                     if ("aeiou".IndexOf(sb[k]) >= 0)
@@ -252,7 +252,7 @@ public static class Romanizer
                 geminate = false;
             }
 
-            // ん antes de vocal o y se escribe n' para no confundir sílabas.
+            // ん before a vowel or y is written n' to keep syllables apart.
             if (romaji == "n" && i + length < word.Length &&
                 KanaMap.TryGetValue(word[i + length].ToString(), out var next) &&
                 next.Length > 0 && (next[0] is 'a' or 'i' or 'u' or 'e' or 'o' || next[0] == 'y'))
@@ -267,7 +267,7 @@ public static class Romanizer
         }
     }
 
-    // -------------------------------------------------------------- Cirílico
+    // -------------------------------------------------------------- Cyrillic
 
     static readonly Dictionary<char, string> Cyrillic = new()
     {
@@ -276,7 +276,7 @@ public static class Romanizer
         ['н'] = "n", ['о'] = "o", ['п'] = "p", ['р'] = "r", ['с'] = "s", ['т'] = "t", ['у'] = "u",
         ['ф'] = "f", ['х'] = "kh", ['ц'] = "ts", ['ч'] = "ch", ['ш'] = "sh", ['щ'] = "shch",
         ['ъ'] = "", ['ы'] = "y", ['ь'] = "", ['э'] = "e", ['ю'] = "yu", ['я'] = "ya",
-        // Ucraniano y bielorruso.
+        // Ukrainian and Belarusian.
         ['є'] = "ye", ['і'] = "i", ['ї'] = "yi", ['ґ'] = "g", ['ў'] = "w",
     };
 
@@ -289,7 +289,7 @@ public static class Romanizer
             return;
         }
 
-        // "е" al inicio de palabra suena "ye" (ель → yel).
+        // "е" at the start of a word sounds like "ye" (ель → yel).
         if (lower == 'е' && wordStart) latin = "ye";
         if (latin.Length == 0) return;
 
@@ -303,7 +303,7 @@ public static class Romanizer
         sb.Append(latin);
     }
 
-    // ------------------------------------------------------------- Utilidades
+    // ------------------------------------------------------------- Helpers
 
     static bool IsHangulSyllable(char ch) => ch is >= '가' and <= '힣';
 

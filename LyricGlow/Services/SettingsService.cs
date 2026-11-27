@@ -197,8 +197,8 @@ public sealed class SettingsService : IAppSettingsStore
         NormalizeExtras(s);
     }
 
-    // Ajustes de la 0.9.40. Un settings.json editado a mano o dañado no debe
-    // dejar diccionarios en null ni valores fuera de rango.
+    // 0.9.40 settings. A hand-edited or damaged settings.json must not leave
+    // null dictionaries or out-of-range values.
     static void NormalizeExtras(AppSettings s)
     {
         s.PerLineOffsetMs ??= new Dictionary<string, Dictionary<string, int>>();

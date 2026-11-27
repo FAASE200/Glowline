@@ -9,13 +9,13 @@ using LyricGlow.Services;
 
 namespace LyricGlow;
 
-// Funciones de la 0.9.40: menú de cada línea (compartir como imagen y ajuste
-// fino de sincronía).
+// 0.9.40 extras: per-line menu (share as image and fine timing
+// adjustment).
 public partial class FullscreenWindow
 {
     const int LineNudgeMs = 100;
 
-    /// <summary>True mientras la vista de letras ocupa la pantalla completa y está al frente.</summary>
+    /// <summary>True while the lyrics view is full screen and in front.</summary>
     public bool IsShowingFullscreen =>
         _isOpen && IsVisible && IsActive && !_windowed && WindowState != WindowState.Minimized;
 
@@ -58,9 +58,9 @@ public partial class FullscreenWindow
         (ms > 0 ? "+" : "−") + (Math.Abs(ms) / 1000.0).ToString("0.0#", System.Globalization.CultureInfo.CurrentCulture) + " s";
 
     /// <summary>
-    /// Comparte la línea indicada, o la que suena si es -1. Usa la letra y la
-    /// portada de los servicios, así funciona también con la pantalla completa
-    /// cerrada (por ejemplo, desde el atajo global).
+    /// Shares the given line, or the one playing if -1. Uses the lyrics and
+    /// cover from the services, so it also works with the full-screen view
+    /// closed (for example, from the global shortcut).
     /// </summary>
     public async void ShareLine(int index = -1)
     {

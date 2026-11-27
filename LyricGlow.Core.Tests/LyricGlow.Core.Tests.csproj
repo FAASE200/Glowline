@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Pruebas sin dependencias externas: se ejecutan con `dotnet run` y
-    devuelven código de salida distinto de 0 si alguna falla. Así funcionan
-    igual en local, sin conexión a NuGet, y en GitHub Actions.
+    Tests with no external dependencies: run them with `dotnet run`; the
+    exit code is non-zero if any test fails. This works the same locally
+    (no NuGet access needed) and on GitHub Actions.
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>

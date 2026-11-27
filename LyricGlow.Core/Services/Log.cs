@@ -21,8 +21,8 @@ public static class Log
                 var fi = new FileInfo(LogFile);
                 if (fi.Exists && fi.Length > 512 * 1024)
                 {
-                    // Se conserva el registro anterior en log.old.txt: así un
-                    // error justo antes del corte no desaparece del reporte.
+                    // Keep the previous log as log.old.txt so an error right
+                    // before the rollover still shows up in bug reports.
                     File.Move(LogFile, PreviousLogFile, overwrite: true);
                 }
                 File.AppendAllText(LogFile, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {message}{Environment.NewLine}");

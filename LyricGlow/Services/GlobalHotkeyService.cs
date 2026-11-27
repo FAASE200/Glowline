@@ -7,9 +7,9 @@ using System.Windows.Interop;
 namespace LyricGlow.Services;
 
 /// <summary>
-/// Atajos de teclado que funcionan aunque Glowline no esté enfocado.
-/// Usan Ctrl+Alt+Shift para no chocar con atajos de otras apps ni con AltGr
-/// (que en teclados en español equivale a Ctrl+Alt).
+/// Keyboard shortcuts that work even when Glowline isn't focused.
+/// They use Ctrl+Alt+Shift to avoid clashing with other apps and with AltGr
+/// (which equals Ctrl+Alt on Spanish and many other keyboard layouts).
 /// </summary>
 public sealed class GlobalHotkeyService : IDisposable
 {
@@ -48,7 +48,7 @@ public sealed class GlobalHotkeyService : IDisposable
         _hotkeys.Add(new Hotkey(5, Key.S, "HotkeyShare", () => App.Primary?.ShareLine()));
     }
 
-    /// <summary>Registra o libera los atajos según el ajuste.</summary>
+    /// <summary>Registers or releases the shortcuts according to the setting.</summary>
     public void Apply(bool enabled)
     {
         if (enabled) Register();
@@ -59,7 +59,7 @@ public sealed class GlobalHotkeyService : IDisposable
     {
         if (_source is null)
         {
-            // Ventana solo de mensajes: recibe WM_HOTKEY sin mostrarse nunca.
+            // Message-only window: receives WM_HOTKEY without ever being shown.
             var parameters = new HwndSourceParameters("GlowlineHotkeys")
             {
                 ParentWindow = new IntPtr(-3), // HWND_MESSAGE
@@ -79,8 +79,8 @@ public sealed class GlobalHotkeyService : IDisposable
             }
             else
             {
-                // Otra app ya usa la combinación: se informa en Ajustes.
-                Log.Write($"hotkey {hotkey.Gesture}: no disponible ({Marshal.GetLastWin32Error()})");
+                // Another app already uses this combination: shown in Settings.
+                Log.Write($"hotkey {hotkey.Gesture}: unavailable ({Marshal.GetLastWin32Error()})");
             }
         }
     }

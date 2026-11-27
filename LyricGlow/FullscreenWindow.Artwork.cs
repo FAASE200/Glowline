@@ -21,7 +21,7 @@ using LyricGlow.Services;
 
 namespace LyricGlow;
 
-// Portada estática y animada, muestreo de color y fondos difuminados.
+// Static and animated cover, color sampling and blurred backgrounds.
 public partial class FullscreenWindow
 {
     void FadeArtToPlaceholder()

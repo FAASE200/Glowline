@@ -7,9 +7,9 @@ using LyricGlow.Models;
 namespace LyricGlow.Services;
 
 /// <summary>
-/// Estado "lo que está sonando" para las integraciones (OBS y Discord).
-/// Se calcula en el hilo de la interfaz, que es donde LyricsService es
-/// seguro, y se publica como una instantánea inmutable.
+/// "Now playing" state for the integrations (OBS and Discord).
+/// It is computed on the UI thread, where LyricsService is safe to use,
+/// and published as an immutable snapshot.
 /// </summary>
 public sealed class NowPlayingHub : IDisposable
 {
@@ -46,7 +46,7 @@ public sealed class NowPlayingHub : IDisposable
 
     public DiscordPresence Discord => _discord;
 
-    /// <summary>Aplica los ajustes actuales: arranca o detiene cada integración.</summary>
+    /// <summary>Applies the current settings: starts or stops each integration.</summary>
     public void Apply(AppSettings settings)
     {
         _overlay.SetEnabled(settings.ObsOverlayEnabled, settings.ObsOverlayPort);
@@ -96,8 +96,8 @@ public sealed class NowPlayingHub : IDisposable
 
     void Publish(Snapshot snapshot)
     {
-        // Discord solo muestra canción, artista y tiempo: se le avisa cuando
-        // cambia algo de eso (o se salta en la canción), no en cada línea.
+        // Discord only shows song, artist and time: notify it when one of
+        // those changes (or on a seek), not on every line.
         var last = _last;
         var discordChanged = last is null ||
                              last.TrackKey != snapshot.TrackKey ||
@@ -106,7 +106,7 @@ public sealed class NowPlayingHub : IDisposable
                              last.Artist != snapshot.Artist ||
                              last.Album != snapshot.Album ||
                              last.Duration != snapshot.Duration;
-        // Entre dos ticks (200 ms) la posición avanza poco; un salto grande es un seek.
+        // Between two ticks (200 ms) the position barely moves; a big jump is a seek.
         var expected = last is null ? 0 : last.Position + (last.Playing ? 0.2 : 0);
         var seeked = last is not null && last.TrackKey == snapshot.TrackKey &&
                      Math.Abs(snapshot.Position - expected) > 2.5;
