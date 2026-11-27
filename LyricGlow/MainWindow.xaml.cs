@@ -73,7 +73,8 @@ public partial class MainWindow : Window
             var duration = Track.Duration is > 0
                 ? TimeSpan.FromSeconds(Track.Duration.Value).ToString(@"m\:ss")
                 : "--:--";
-            return $"{Track.TrackName} — {Track.ArtistName} · {duration} · {mode}";
+            var provider = string.IsNullOrEmpty(Track.Provider) ? "LRCLIB" : Track.Provider;
+            return $"{Track.TrackName} — {Track.ArtistName} · {duration} · {mode} · {provider}";
         }
     }
 

@@ -50,6 +50,10 @@ public sealed class LrcLine
     public string Background { get; init; } = "";
     public IReadOnlyList<LrcWord>? Words { get; init; }
     public IReadOnlyList<LrcWord>? BackgroundWords { get; init; }
+    /// <summary>Pronunciación en letras latinas (vacía si no aplica).</summary>
+    public string Romanized { get; init; } = "";
+    /// <summary>Tiempo original de la fuente, antes de ajustes por línea.</summary>
+    public double SourceTime { get; init; } = double.NaN;
 }
 
 public sealed class LrcWord
@@ -71,6 +75,8 @@ public sealed class LrclibTrack
     [JsonPropertyName("syncedLyrics")] public string? SyncedLyrics { get; set; }
     [JsonPropertyName("lyricsfile")] public string? LyricsFile { get; set; }
     public string Source { get; set; } = "LRCLIB";
+    /// <summary>Servicio que entregó la letra (LRCLIB, Lrcmux o LyricsPlus).</summary>
+    [JsonPropertyName("provider")] public string Provider { get; set; } = "";
 
     [JsonIgnore] public bool HasSynced => !string.IsNullOrWhiteSpace(SyncedLyrics);
     [JsonIgnore] public bool HasPlain => !string.IsNullOrWhiteSpace(PlainLyrics);
@@ -133,4 +139,18 @@ public sealed class AppSettings
     public AppLanguage Language { get; set; } = AppLanguage.English;
     public DesignProfile? ActiveDesign { get; set; }
     public int MobilePresetIndex { get; set; } = 1;
+
+    // ---- 0.9.40 ----
+    /// <summary>Ajuste fino por línea: canción → (tiempo original en ms → desfase en ms).</summary>
+    public Dictionary<string, Dictionary<string, int>> PerLineOffsetMs { get; set; } = new();
+    /// <summary>Letras elegidas a mano desde Lrcmux o LyricsPlus (canción → proveedor).</summary>
+    public Dictionary<string, string> ManualPins { get; set; } = new();
+    public bool RomanizationEnabled { get; set; }
+    public bool MiniLyricsEnabled { get; set; }
+    public double? MiniLyricsLeft { get; set; }
+    public double? MiniLyricsTop { get; set; }
+    public bool GlobalHotkeysEnabled { get; set; } = true;
+    public bool ObsOverlayEnabled { get; set; }
+    public int ObsOverlayPort { get; set; } = 7531;
+    public bool DiscordPresenceEnabled { get; set; }
 }

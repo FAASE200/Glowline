@@ -995,6 +995,8 @@ public partial class FullscreenWindow : Window
             Words = line.Words,
             Background = "",
             BackgroundWords = null,
+            Romanized = line.Romanized,
+            SourceTime = line.SourceTime,
         };
     }
 
