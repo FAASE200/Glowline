@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Bridge from 0.9.30 (published under the app's old name) to the current
+    Glowline. Release workflows attach it under the installer file name the
+    0.9.30 updater looks for; when that updater runs it, the bridge downloads
+    the newest Glowline installer, verifies it and starts Glowline. See
+    Program.cs for the details.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>GlowlineBridge</AssemblyName>
+    <RootNamespace>Glowline.Bridge</RootNamespace>
+    <Version>0.9.35</Version>
+    <Product>Glowline</Product>
+    <Company>fSS</Company>
+    <ApplicationIcon>..\Glowline\app.ico</ApplicationIcon>
+
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>true</PublishTrimmed>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <DebuggerSupport>false</DebuggerSupport>
+    <EventSourceSupport>false</EventSourceSupport>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,111 @@
+name: Bridge release
+
+# Builds the 0.9.30 bridge (Glowline.Bridge) and creates a DRAFT release
+# v<bridge version> for it. The 0.9.30 updater only reads the latest release
+# and only installs a file with the app's old installer name, so the bridge is
+# attached under that name. A copy of the newest Glowline portable is attached
+# as Glowline.exe so that Glowline itself sees an asset in this release and
+# reports "up to date" instead of "missing installer" while it is the latest.
+#
+# Like the main release, the draft is published by hand after testing.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Glowline.Bridge/**
+      - docs/release-notes/0.9.35.md
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bridge-release
+  cancel-in-progress: false
+
+jobs:
+  bridge:
+    runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [xml]$project = Get-Content Glowline.Bridge/Glowline.Bridge.csproj
+          $version = [string]@($project.Project.PropertyGroup.Version)[0]
+          "TAG=v$version" >> $env:GITHUB_ENV
+          "version=$version" >> $env:GITHUB_OUTPUT
+          $notes = "docs/release-notes/$version.md"
+          "notes=$notes" >> $env:GITHUB_OUTPUT
+
+          $published = $false
+          $existing = gh release view "v$version" --json isDraft 2>$null | ConvertFrom-Json
+          if ($existing -and -not $existing.isDraft) { $published = $true }
+          $ready = (Test-Path $notes) -and -not $published
+          if (-not (Test-Path $notes)) { Write-Host "No $notes yet: skipping release." }
+          if ($published) { Write-Host "v$version is already published: skipping release." }
+          "ready=$ready".ToLowerInvariant() >> $env:GITHUB_OUTPUT
+          $global:LASTEXITCODE = 0
+
+      - name: Publish the bridge
+        if: steps.version.outputs.ready == 'true'
+        run: dotnet publish Glowline.Bridge/Glowline.Bridge.csproj -c Release -o bridge-out
+
+      - name: Collect release assets
+        if: steps.version.outputs.ready == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $out = New-Item -ItemType Directory -Force release-assets
+          # The file name the 0.9.30 updater looks for.
+          Copy-Item bridge-out/GlowlineBridge.exe (Join-Path $out "LyricGlowSetup-$version.exe")
+
+          # Newest published Glowline release with a portable build.
+          $releases = gh api "repos/${{ github.repository }}/releases?per_page=30" | ConvertFrom-Json
+          $source = $releases |
+            Where-Object { -not $_.draft -and ($_.assets.name -match '^Glowline-[\d.]+-portable\.exe$') } |
+            Sort-Object { [version]($_.tag_name.TrimStart('v')) } -Descending |
+            Select-Object -First 1
+          if (-not $source) { throw 'No published Glowline release with a portable build.' }
+          $portable = $source.assets | Where-Object name -match '^Glowline-[\d.]+-portable\.exe$' | Select-Object -First 1
+          gh release download $source.tag_name --pattern $portable.name --dir portable-src
+          Copy-Item (Join-Path portable-src $portable.name) (Join-Path $out 'Glowline.exe')
+          "SOURCE_TAG=$($source.tag_name)" >> $env:GITHUB_ENV
+
+          Get-ChildItem $out | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
+            "{0,-36} {1}" -f $_.Name, $hash
+          } | Tee-Object -FilePath hashes.txt
+
+      - name: Create draft release
+        if: steps.version.outputs.ready == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = Get-Content "${{ steps.version.outputs.notes }}" -Raw -Encoding UTF8
+          $hashes = Get-Content hashes.txt -Raw
+          $body = "$notes`n### SHA-256`n`n``````text`n$hashes``````"
+          Set-Content release-body.md $body -Encoding UTF8
+
+          $existing = gh release view $env:TAG --json isDraft 2>$null | ConvertFrom-Json
+          if ($existing) {
+            gh release delete $env:TAG --yes
+          }
+
+          gh release create $env:TAG --draft --target $env:GITHUB_SHA --title "$env:TAG Bridge" `
+            --notes-file release-body.md (Get-ChildItem release-assets).FullName
