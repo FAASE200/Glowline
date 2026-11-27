@@ -141,16 +141,24 @@ public sealed class UpdateService
                 return;
             }
 
+            var newer = release.Version > CurrentVersion;
             var asset = _release.FindAsset(release,
                 $"GlowlineSetup-{Format(release.Version)}.exe",
                 "Glowline.exe");
             if (asset is null)
             {
+                // An older release without a Glowline installer (such as the
+                // 0.9.35 bridge for 0.9.30) is not an error: this version is newer.
+                if (!newer)
+                {
+                    lock (_gate) _readyPath = null;
+                    SetState(UpdatePhase.UpToDate, "UpdateUpToDateFormat", new object?[] { CurrentVersionText });
+                    return;
+                }
                 SetState(UpdatePhase.Failed, "UpdateMissingAsset");
                 return;
             }
 
-            var newer = release.Version > CurrentVersion;
             string notes;
             if (newer)
             {
