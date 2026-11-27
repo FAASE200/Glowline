@@ -1,6 +1,6 @@
 name: Release
 
-# When main gets a new version (LyricGlow.csproj) or its release notes
+# When main gets a new version (Glowline.csproj) or its release notes
 # (docs/release-notes/<version>.md), this builds the Windows installer and the
 # portable app and creates a DRAFT GitHub release v<version>. GitHub creates
 # the tag when the draft is published, which is a manual step: the in-app
@@ -11,7 +11,7 @@ on:
   push:
     branches: [main]
     paths:
-      - LyricGlow/LyricGlow.csproj
+      - Glowline/Glowline.csproj
       - docs/release-notes/**
   workflow_dispatch:
 
@@ -42,7 +42,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          [xml]$project = Get-Content LyricGlow/LyricGlow.csproj
+          [xml]$project = Get-Content Glowline/Glowline.csproj
           $version = [string]@($project.Project.PropertyGroup.Version)[0]
           "TAG=v$version" >> $env:GITHUB_ENV
           "version=$version" >> $env:GITHUB_OUTPUT
@@ -61,17 +61,17 @@ jobs:
           # "gh release view" fails when the release doesn't exist yet; that's expected.
           $global:LASTEXITCODE = 0
 
-      - name: Test LyricGlow.Core
+      - name: Test Glowline.Core
         if: steps.version.outputs.ready == 'true'
-        run: dotnet run --project LyricGlow.Core.Tests/LyricGlow.Core.Tests.csproj -c Release
+        run: dotnet run --project Glowline.Core.Tests/Glowline.Core.Tests.csproj -c Release
 
       - name: Publish the Windows app
         if: steps.version.outputs.ready == 'true'
         run: >
-          dotnet publish LyricGlow/LyricGlow.csproj -c Release -r win-x64
+          dotnet publish Glowline/Glowline.csproj -c Release -r win-x64
           --self-contained true -p:PublishSingleFile=true
           -p:EnableCompressionInSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true -o LyricGlow/publish
+          -p:IncludeNativeLibrariesForSelfExtract=true -o Glowline/publish
 
       - name: Install WiX 5
         if: steps.version.outputs.ready == 'true'
@@ -82,7 +82,7 @@ jobs:
       - name: Build installers
         if: steps.version.outputs.ready == 'true'
         shell: pwsh
-        run: ./LyricGlow/tools/build-installers.ps1 -Version ${{ steps.version.outputs.version }} -PublishDir "$PWD/LyricGlow/publish"
+        run: ./Glowline/tools/build-installers.ps1 -Version ${{ steps.version.outputs.version }} -PublishDir "$PWD/Glowline/publish"
 
       - name: Collect release assets
         if: steps.version.outputs.ready == 'true'
@@ -91,8 +91,8 @@ jobs:
         run: |
           $version = "${{ steps.version.outputs.version }}"
           $out = New-Item -ItemType Directory -Force release-assets
-          Copy-Item "LyricGlow/publish/LyricGlowSetup-$version.exe" $out
-          Copy-Item "LyricGlow/publish/LyricGlow.exe" (Join-Path $out "Glowline-$version-portable.exe")
+          Copy-Item "Glowline/publish/GlowlineSetup-$version.exe" $out
+          Copy-Item "Glowline/publish/Glowline.exe" (Join-Path $out "Glowline-$version-portable.exe")
           Get-ChildItem $out | ForEach-Object {
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
             "{0,-36} {1}" -f $_.Name, $hash

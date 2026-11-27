@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="LyricGlow/Branding/pulse-logo-icon-256.png" width="96" alt="Glowline logo">
+  <img src="Glowline/Branding/pulse-logo-icon-256.png" width="96" alt="Glowline logo">
 </p>
 
 <h1 align="center">Glowline</h1>
@@ -26,9 +26,6 @@ provides it.
 Releases include the Windows installer, a portable Windows build and an
 experimental Android APK.
 
-> The installed Windows executable keeps the internal name `LyricGlow.exe` for
-> update compatibility.
-
 ## Features
 
 - Full-screen lyrics with smooth verse transitions and word-level timing.
@@ -52,7 +49,7 @@ experimental Android APK.
 
 ## Download
 
-Download the latest `LyricGlowSetup-<version>.exe` from
+Download the latest `GlowlineSetup-<version>.exe` from
 [Releases](https://github.com/FAASE200/Glowline/releases). The installer
 includes the self-contained Windows x64 build, so no .NET installation is
 required. A portable `.exe` that needs no installation is also attached.
@@ -125,7 +122,7 @@ The overlay only accepts connections from your own computer.
 - **A global shortcut doesn't work.** Another app already uses it; Settings →
   Extras marks which ones are taken.
 - **Reporting a bug.** Please attach the log file from
-  `%LOCALAPPDATA%\LyricGlow\log.txt` (and `log.old.txt` if it exists) to your
+  `%LOCALAPPDATA%\Glowline\log.txt` (and `log.old.txt` if it exists) to your
   [issue](https://github.com/FAASE200/Glowline/issues/new/choose).
 
 ## Build from source
@@ -133,29 +130,29 @@ The overlay only accepts connections from your own computer.
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) on Windows.
 
 ```powershell
-dotnet build LyricGlow/LyricGlow.csproj -c Release
+dotnet build Glowline/Glowline.csproj -c Release
 ```
 
 Run the core tests (no extra packages needed; this also works on Linux and
 macOS):
 
 ```powershell
-dotnet run --project LyricGlow.Core.Tests -c Release
+dotnet run --project Glowline.Core.Tests -c Release
 ```
 
 To produce the portable development build:
 
 ```powershell
-dotnet publish LyricGlow/LyricGlow.csproj -c Release -r win-x64 `
+dotnet publish Glowline/Glowline.csproj -c Release -r win-x64 `
   --self-contained true -p:PublishSingleFile=true `
   -p:EnableCompressionInSingleFile=true `
-  -p:IncludeNativeLibrariesForSelfExtract=true -o LyricGlow/publish
+  -p:IncludeNativeLibrariesForSelfExtract=true -o Glowline/publish
 ```
 
 To build the Windows installer:
 
 ```powershell
-LyricGlow/tools/build-installers.ps1 -Version 0.9.40
+Glowline/tools/build-installers.ps1 -Version 0.9.40
 ```
 
 The Android project is included in the source tree; its APK is published as
@@ -165,10 +162,10 @@ an experimental download.
 
 | Folder | Contents |
 | --- | --- |
-| `LyricGlow.Core` | Platform-independent logic: lyrics sources, LRC parsing, caching, artwork lookup and the update client. |
-| `LyricGlow` | Windows app (WPF): media session, full-screen view, settings and installer. |
-| `LyricGlow.Android` | Android app (.NET MAUI), experimental. |
-| `LyricGlow.Core.Tests` | Dependency-free tests for `LyricGlow.Core`. |
+| `Glowline.Core` | Platform-independent logic: lyrics sources, LRC parsing, caching, artwork lookup and the update client. |
+| `Glowline` | Windows app (WPF): media session, full-screen view, settings and installer. |
+| `Glowline.Android` | Android app (.NET MAUI), experimental. |
+| `Glowline.Core.Tests` | Dependency-free tests for `Glowline.Core`. |
 
 Every push and pull request is built and tested on Windows by
 [GitHub Actions](.github/workflows/build.yml).

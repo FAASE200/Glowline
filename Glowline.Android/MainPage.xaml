@@ -1,0 +1,99 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Glowline.Android.MainPage"
+             BackgroundColor="#08080A">
+
+    <ScrollView>
+        <VerticalStackLayout x:Name="ContentStack" Padding="20,16,20,24" Spacing="16">
+
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <VerticalStackLayout Spacing="2">
+                    <HorizontalStackLayout Spacing="9" VerticalOptions="Center">
+                        <Image x:Name="BrandLogoDark" WidthRequest="34" HeightRequest="34"
+                               Source="pulse_logo.png" Aspect="AspectFit" VerticalOptions="Center"/>
+                        <Image x:Name="BrandLogoLight" WidthRequest="34" HeightRequest="34" IsVisible="False"
+                               Source="pulse_logo_light.png" Aspect="AspectFit" VerticalOptions="Center"/>
+                        <Label x:Name="AppTitle" Text="Glowline" FontSize="28" FontFamily="OpenSansSemibold" TextColor="#F5F5F7"
+                               VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                    <Label x:Name="VersionText" FontSize="12" TextColor="#85858D" />
+                </VerticalStackLayout>
+                <Button x:Name="SettingsButton" Grid.Column="1" Text="⚙" FontSize="20" WidthRequest="46" HeightRequest="46"
+                        Padding="0" CornerRadius="23" BackgroundColor="#1AFFFFFF" TextColor="#F5F5F7" Clicked="OnSettings" />
+            </Grid>
+
+            <Frame x:Name="HeroCard" CornerRadius="22" BackgroundColor="#141417" BorderColor="#1FFFFFFF" Padding="16" HasShadow="False">
+                <VerticalStackLayout Spacing="14">
+                    <Grid ColumnDefinitions="96,*" ColumnSpacing="14">
+                        <Border x:Name="CoverFrame" WidthRequest="96" HeightRequest="96" StrokeThickness="0"
+                                BackgroundColor="#242429" Padding="0" StrokeShape="RoundRectangle 18">
+                            <Grid>
+                                <Label x:Name="CoverPlaceholder" Text="♪" FontSize="34" TextColor="#3AFFFFFF"
+                                       HorizontalOptions="Center" VerticalOptions="Center" />
+                                <Image x:Name="CoverA" Aspect="AspectFill" />
+                                <Image x:Name="CoverB" Aspect="AspectFill" Opacity="0" />
+                            </Grid>
+                        </Border>
+                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="3">
+                            <Label x:Name="TrackTitle" FontSize="18" FontFamily="OpenSansSemibold" TextColor="#F5F5F7"
+                                   MaxLines="2" LineBreakMode="TailTruncation" />
+                            <Label x:Name="TrackArtist" FontSize="13" TextColor="#A8A8B0" MaxLines="1" LineBreakMode="TailTruncation" />
+                            <Label x:Name="TrackSource" FontSize="11" TextColor="#6F6F78" MaxLines="1" />
+                            <Border x:Name="StatusPill" BackgroundColor="#14FFFFFF" StrokeThickness="0" StrokeShape="RoundRectangle 999"
+                                    Padding="9,3" HorizontalOptions="Start" Margin="0,4,0,0">
+                                <HorizontalStackLayout Spacing="6">
+                                    <Ellipse x:Name="StatusDot" WidthRequest="6" HeightRequest="6" Fill="#6B7280"
+                                             VerticalOptions="Center" />
+                                    <Label x:Name="PlaybackStatusText" FontSize="11" TextColor="#C7C7CC" VerticalOptions="Center" />
+                                </HorizontalStackLayout>
+                            </Border>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Label x:Name="StatusText" FontSize="12" TextColor="#A8A8B0" LineBreakMode="WordWrap" />
+
+                    <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="10">
+                        <Button x:Name="PreviousButton" Text="⏮" FontSize="16" WidthRequest="46" HeightRequest="42"
+                                Padding="0" CornerRadius="21" BackgroundColor="#1FFFFFFF" TextColor="#F5F5F7" Clicked="OnPrevious" />
+                        <Button x:Name="PlayButton" Grid.Column="1" Text="▶" FontSize="19" WidthRequest="52" HeightRequest="52"
+                                Padding="0" CornerRadius="26" BackgroundColor="#FF375F" TextColor="White" Clicked="OnPlayPause" />
+                        <Button x:Name="NextButton" Grid.Column="2" Text="⏭" FontSize="16" WidthRequest="46" HeightRequest="42"
+                                Padding="0" CornerRadius="21" BackgroundColor="#1FFFFFFF" TextColor="#F5F5F7" Clicked="OnNext" />
+                        <Label x:Name="PositionText" Grid.Column="4" FontSize="11" TextColor="#85858D" VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Frame>
+
+            <Button x:Name="FullscreenButton" Text="" FontSize="16" FontFamily="OpenSansSemibold" CornerRadius="18"
+                    HeightRequest="52" BackgroundColor="#FF375F" TextColor="White" Clicked="OnFullscreen" />
+
+            <Frame x:Name="PermissionsCard" CornerRadius="22" BackgroundColor="#141417" BorderColor="#1FFFFFFF" Padding="16" HasShadow="False">
+                <VerticalStackLayout Spacing="10">
+                    <Label x:Name="PermissionsTitle" FontSize="16" FontFamily="OpenSansSemibold" TextColor="#F5F5F7" />
+                    <Label x:Name="PermissionsHint" FontSize="12" TextColor="#85858D" LineBreakMode="WordWrap" />
+                    <Button x:Name="NotificationAccessButton" Text="" CornerRadius="14" HeightRequest="44"
+                            BackgroundColor="#242429" TextColor="#F5F5F7" Clicked="OnNotificationAccess" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <Frame x:Name="UpdatesCard" CornerRadius="22" BackgroundColor="#141417" BorderColor="#1FFFFFFF" Padding="16" HasShadow="False">
+                <VerticalStackLayout Spacing="10">
+                    <Label x:Name="UpdatesTitle" FontSize="16" FontFamily="OpenSansSemibold" TextColor="#F5F5F7" />
+                    <Label x:Name="UpdateVersionText" FontSize="13" TextColor="#A8A8B0" />
+                    <Label x:Name="UpdateStatusText" FontSize="12" TextColor="#85858D" LineBreakMode="WordWrap" />
+                    <ProgressBar x:Name="UpdateProgress" HeightRequest="4" IsVisible="False" ProgressColor="#FF375F" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <Button x:Name="UpdateCheckButton" Grid.Column="0" Text="" CornerRadius="14" HeightRequest="44"
+                                BackgroundColor="#242429" TextColor="#F5F5F7" Clicked="OnCheckUpdate" />
+                        <Button x:Name="UpdateInstallButton" Grid.Column="1" Text="" IsVisible="False" CornerRadius="14" HeightRequest="44"
+                                BackgroundColor="#FF375F" TextColor="White" Clicked="OnInstallUpdate" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Frame>
+
+            <Label x:Name="FooterText" FontSize="11" TextColor="#5F5F68" HorizontalOptions="Center" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

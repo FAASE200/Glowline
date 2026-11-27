@@ -27,16 +27,16 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Test LyricGlow.Core
-        run: dotnet run --project LyricGlow.Core.Tests/LyricGlow.Core.Tests.csproj -c Release
+      - name: Test Glowline.Core
+        run: dotnet run --project Glowline.Core.Tests/Glowline.Core.Tests.csproj -c Release
 
       - name: Build the Windows app
-        run: dotnet build LyricGlow/LyricGlow.csproj -c Release
+        run: dotnet build Glowline/Glowline.csproj -c Release
 
       - name: Publish portable build
         if: github.event_name == 'push'
         run: >
-          dotnet publish LyricGlow/LyricGlow.csproj -c Release -r win-x64
+          dotnet publish Glowline/Glowline.csproj -c Release -r win-x64
           --self-contained true -p:PublishSingleFile=true
           -p:EnableCompressionInSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true -o publish
@@ -46,5 +46,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Glowline-portable-win-x64
-          path: publish/LyricGlow.exe
+          path: publish/Glowline.exe
           retention-days: 14
