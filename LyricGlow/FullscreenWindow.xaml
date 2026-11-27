@@ -81,6 +81,15 @@
             <Setter Property="Background" Value="#0F000000"/>
             <Setter Property="Foreground" Value="#17171A"/>
         </Style>
+        <Style x:Key="TransportArrow" TargetType="Path">
+            <Setter Property="Width" Value="17"/>
+            <Setter Property="Height" Value="17"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="Fill" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+            <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+            <Setter Property="StrokeThickness" Value="1.1"/>
+            <Setter Property="StrokeLineJoin" Value="Round"/>
+        </Style>
         <Style x:Key="ChromeCircle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Width" Value="38"/>
             <Setter Property="Height" Value="38"/>
@@ -395,7 +404,7 @@
                 <StackPanel x:Name="DarkInfoPanel" Width="380" VerticalAlignment="Center">
                     <Border x:Name="DarkCoverBorder" CornerRadius="18" Width="380" Height="380">
                         <Border.Effect>
-                            <DropShadowEffect BlurRadius="70" ShadowDepth="20" Opacity="0.55" Color="Black"/>
+                            <DropShadowEffect BlurRadius="70" ShadowDepth="20" Opacity="0.55" Color="Black" RenderingBias="Performance"/>
                         </Border.Effect>
                         <Grid x:Name="DarkCoverContent">
                             <Border CornerRadius="18" Background="#17171B"/>
@@ -424,10 +433,22 @@
                                TextTrimming="CharacterEllipsis"/>
 
                     <StackPanel x:Name="DarkTransport" Margin="0,22,0,0">
+                        <StackPanel.RenderTransform>
+                            <TranslateTransform x:Name="DarkTransportShift"/>
+                        </StackPanel.RenderTransform>
                         <StackPanel x:Name="DarkTransportButtons" Orientation="Horizontal">
-                            <Button x:Name="PrevButton" Content="⏮" Style="{StaticResource GhostCircle}"/>
-                            <Button x:Name="PlayPauseButton" Content="▶" Style="{StaticResource GhostCircle}" Margin="10,0"/>
-                            <Button x:Name="NextButton" Content="⏭" Style="{StaticResource GhostCircle}"/>
+                            <Button x:Name="PrevButton" Style="{StaticResource GhostCircle}">
+                                <Path Style="{StaticResource TransportArrow}"
+                                      Data="M 4,4.4 L 6.4,4.4 L 6.4,19.6 L 4,19.6 Z M 19.6,4.4 L 7.8,12 L 19.6,19.6 Z"/>
+                            </Button>
+                            <Button x:Name="PlayPauseButton" Style="{StaticResource GhostCircle}" Margin="10,0">
+                                <controls:PlayPauseIcon x:Name="DarkPlayPauseIcon" Width="19" Height="19"
+                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Button>
+                            <Button x:Name="NextButton" Style="{StaticResource GhostCircle}">
+                                <Path Style="{StaticResource TransportArrow}"
+                                      Data="M 20,4.4 L 17.6,4.4 L 17.6,19.6 L 20,19.6 Z M 4.4,4.4 L 16.2,12 L 4.4,19.6 Z"/>
+                            </Button>
                         </StackPanel>
 
                         <Grid x:Name="DarkProgress" Margin="2,20,2,0" Width="376">
@@ -439,8 +460,12 @@
                             <TextBlock x:Name="PosText" Text="0:00" FontSize="11" Foreground="#80FFFFFF" VerticalAlignment="Center"/>
                             <Border x:Name="ProgressTrack" Grid.Column="1" Height="3" CornerRadius="2"
                                     Background="#26FFFFFF" Margin="10,0" VerticalAlignment="Center">
-                                <Border x:Name="ProgressFill" HorizontalAlignment="Left" Width="0"
-                                        CornerRadius="2" Background="#FFFFFFFF"/>
+                                <Border x:Name="ProgressFill" HorizontalAlignment="Stretch"
+                                        CornerRadius="2" Background="#FFFFFFFF" RenderTransformOrigin="0,0">
+                                    <Border.RenderTransform>
+                                        <ScaleTransform x:Name="ProgressFillScale" ScaleX="0"/>
+                                    </Border.RenderTransform>
+                                </Border>
                             </Border>
                             <TextBlock x:Name="DurText" Grid.Column="2" Text="--:--" FontSize="11"
                                        Foreground="#80FFFFFF" VerticalAlignment="Center"/>
@@ -491,7 +516,7 @@
             <StackPanel Grid.Row="0" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="24,18,24,0">
                 <Border x:Name="LightCoverBorder" Width="360" Height="360" CornerRadius="20" HorizontalAlignment="Center">
                     <Border.Effect>
-                        <DropShadowEffect BlurRadius="55" ShadowDepth="16" Opacity="0.25" Color="Black"/>
+                        <DropShadowEffect BlurRadius="55" ShadowDepth="16" Opacity="0.25" Color="Black" RenderingBias="Performance"/>
                     </Border.Effect>
                     <Grid x:Name="LightCoverContent">
                         <Border x:Name="LightCoverBack" CornerRadius="20" Background="#F1F1F3"/>
@@ -521,10 +546,22 @@
                            MaxWidth="760" Margin="0,2,0,0"/>
 
                 <StackPanel x:Name="LightTransport" Margin="0,16,0,0">
+                    <StackPanel.RenderTransform>
+                        <TranslateTransform x:Name="LightTransportShift"/>
+                    </StackPanel.RenderTransform>
                     <StackPanel x:Name="LightTransportButtons" Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button x:Name="LightPrevButton" Content="⏮" Style="{StaticResource LightCircle}"/>
-                        <Button x:Name="LightPlayPauseButton" Content="▶" Style="{StaticResource LightCircle}" Margin="10,0"/>
-                        <Button x:Name="LightNextButton" Content="⏭" Style="{StaticResource LightCircle}"/>
+                        <Button x:Name="LightPrevButton" Style="{StaticResource LightCircle}">
+                            <Path Style="{StaticResource TransportArrow}"
+                                  Data="M 4,4.4 L 6.4,4.4 L 6.4,19.6 L 4,19.6 Z M 19.6,4.4 L 7.8,12 L 19.6,19.6 Z"/>
+                        </Button>
+                        <Button x:Name="LightPlayPauseButton" Style="{StaticResource LightCircle}" Margin="10,0">
+                            <controls:PlayPauseIcon x:Name="LightPlayPauseIcon" Width="19" Height="19"
+                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        </Button>
+                        <Button x:Name="LightNextButton" Style="{StaticResource LightCircle}">
+                            <Path Style="{StaticResource TransportArrow}"
+                                  Data="M 20,4.4 L 17.6,4.4 L 17.6,19.6 L 20,19.6 Z M 4.4,4.4 L 16.2,12 L 4.4,19.6 Z"/>
+                        </Button>
                     </StackPanel>
 
                     <Grid x:Name="LightProgress" Margin="0,14,0,0" Width="360">
@@ -536,8 +573,12 @@
                         <TextBlock x:Name="LightPosText" Text="0:00" FontSize="11" Foreground="#8A8A90" VerticalAlignment="Center"/>
                         <Border x:Name="LightProgressTrack" Grid.Column="1" Height="3" CornerRadius="2"
                                 Background="#14000000" Margin="10,0" VerticalAlignment="Center">
-                            <Border x:Name="LightProgressFill" HorizontalAlignment="Left" Width="0"
-                                    CornerRadius="2" Background="#101013"/>
+                            <Border x:Name="LightProgressFill" HorizontalAlignment="Stretch"
+                                    CornerRadius="2" Background="#101013" RenderTransformOrigin="0,0">
+                                <Border.RenderTransform>
+                                    <ScaleTransform x:Name="LightProgressFillScale" ScaleX="0"/>
+                                </Border.RenderTransform>
+                            </Border>
                         </Border>
                         <TextBlock x:Name="LightDurText" Grid.Column="2" Text="--:--" FontSize="11"
                                    Foreground="#8A8A90" VerticalAlignment="Center"/>
@@ -562,7 +603,7 @@
                     BorderThickness="1" CornerRadius="18" Visibility="Collapsed" Opacity="0" Panel.ZIndex="20"
                     TextElement.Foreground="{DynamicResource SettingsInk}">
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="70" ShadowDepth="18" Opacity="0.42" Color="Black"/>
+                    <DropShadowEffect BlurRadius="70" ShadowDepth="18" Opacity="0.42" Color="Black" RenderingBias="Performance"/>
                 </Border.Effect>
                 <Border.RenderTransform>
                     <TranslateTransform x:Name="SettingsPanelShift" Y="-8"/>

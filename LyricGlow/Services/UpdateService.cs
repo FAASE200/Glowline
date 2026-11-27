@@ -26,6 +26,7 @@ public sealed class UpdateInfo
     public long AssetId { get; init; }
     public long Size { get; init; }
     public string? Digest { get; init; }
+    public string Notes { get; init; } = "";
 }
 
 public sealed class UpdateState
@@ -111,22 +112,33 @@ public sealed class UpdateService
                 return;
             }
 
+            var newer = release.Version > CurrentVersion;
+            string notes;
+            if (newer)
+            {
+                if (!ReleaseClient.IsSha256Digest(asset.Digest))
+                {
+                    Log.Write($"update: digest ausente o inválido en {release.Tag} ({asset.Digest ?? "null"})");
+                    SetState(UpdatePhase.Failed, "UpdateHashMismatch");
+                    return;
+                }
+                notes = await ResolveNotesAsync(release, ct);
+            }
+            else
+            {
+                notes = "";
+            }
+
             var info = new UpdateInfo
             {
                 Version = release.Version,
                 AssetId = asset.Id,
                 Size = asset.Size,
                 Digest = asset.Digest,
+                Notes = notes,
             };
 
-            if (release.Version > CurrentVersion && !ReleaseClient.IsSha256Digest(info.Digest))
-            {
-                Log.Write($"update: digest ausente o inválido en {release.Tag} ({info.Digest ?? "null"})");
-                SetState(UpdatePhase.Failed, "UpdateHashMismatch");
-                return;
-            }
-
-            if (release.Version <= CurrentVersion)
+            if (!newer)
             {
                 lock (_gate) _readyPath = null;
                 SetState(UpdatePhase.UpToDate, "UpdateUpToDateFormat",
@@ -149,6 +161,28 @@ public sealed class UpdateService
         finally
         {
             Interlocked.Exchange(ref _checking, 0);
+        }
+    }
+
+    async Task<string> ResolveNotesAsync(ReleaseInfo release, CancellationToken ct)
+    {
+        var cached = release.Notes;
+        if (!string.IsNullOrWhiteSpace(cached)) return cached;
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(TimeSpan.FromSeconds(8));
+            return await _release.GetReleaseNotesAsync(release.Tag, timeout.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            Log.Write("update notes: timeout");
+            return "";
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Write("update notes: " + ex.Message);
+            return "";
         }
     }
 
@@ -188,7 +222,8 @@ public sealed class UpdateService
         {
             try { if (File.Exists(final)) File.Delete(final); } catch { }
             Log.Write("update download: " + ex.Message);
-            SetState(UpdatePhase.Failed, ex is InvalidDataException ? "UpdateHashMismatch" : "UpdateDownloadFailed");
+            SetState(UpdatePhase.Failed, ex is InvalidDataException ? "UpdateHashMismatch" : "UpdateDownloadFailed",
+                info: info);
         }
     }
 

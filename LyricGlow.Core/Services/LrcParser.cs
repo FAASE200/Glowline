@@ -8,21 +8,46 @@ namespace LyricGlow.Services;
 
 public static class LrcParser
 {
-    static readonly Regex TimeTag = new(@"\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]", RegexOptions.Compiled);
-    static readonly Regex OffsetTag = new(@"\[offset:\s*([+-]?\d+)\s*\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    static readonly Regex WordTag = new(@"<(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?>", RegexOptions.Compiled);
+    const int MaxInputChars = 512 * 1024;
+    const int MaxLines = 2000;
+    const int MaxWordsPerLine = 200;
+    const int MaxLineChars = 4096;
+    const int MaxOffsetMs = 5 * 60 * 1000;
+    const int MaxMinutes = 24 * 60;
+    const double MaxTimeSeconds = 24 * 60 * 60;
 
-    public static List<LrcLine> Parse(string lrc)
+    static readonly Regex TimeTag = new(@"\[(\d{1,4}):(\d{1,2})(?:[.:](\d{1,3}))?\]", RegexOptions.Compiled);
+    static readonly Regex OffsetTag = new(@"\[offset:\s*([+-]?\d+)\s*\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    static readonly Regex WordTag = new(@"<(\d{1,4}):(\d{1,2})(?:[.:](\d{1,3}))?>", RegexOptions.Compiled);
+
+    public static List<LrcLine> Parse(string? lrc)
     {
         var lines = new List<LrcLine>();
-        var offsetMs = 0;
-
-        foreach (var raw in lrc.Replace("\r", "").Split('\n'))
+        if (string.IsNullOrEmpty(lrc)) return lines;
+        if (lrc.Length > MaxInputChars)
         {
+            Log.Write("lrc: entrada excede el límite");
+            return lines;
+        }
+
+        var rawLines = lrc.Replace("\r", "").Split('\n');
+        if (rawLines.Length > MaxLines)
+        {
+            Log.Write("lrc: demasiadas líneas");
+            return lines;
+        }
+
+        var offsetMs = 0;
+        var totalWords = 0;
+        foreach (var raw in rawLines)
+        {
+            if (raw.Length > MaxLineChars) continue;
+
             var offsetMatch = OffsetTag.Match(raw);
             if (offsetMatch.Success)
             {
-                if (int.TryParse(offsetMatch.Groups[1].Value, out var off)) offsetMs = off;
+                if (int.TryParse(offsetMatch.Groups[1].Value, out var off))
+                    offsetMs = Math.Clamp(off, -MaxOffsetMs, MaxOffsetMs);
                 continue;
             }
 
@@ -37,7 +62,7 @@ public static class LrcParser
             if (lineMatches.Count == 1)
             {
                 var wordMatches = WordTag.Matches(withoutLineTags);
-                if (wordMatches.Count > 0)
+                if (wordMatches.Count is > 0 and <= MaxWordsPerLine)
                 {
                     var parsedWords = new List<LrcWord>(wordMatches.Count);
                     for (var i = 0; i < wordMatches.Count; i++)
@@ -54,12 +79,23 @@ public static class LrcParser
                         }
                         parsedWords.Add(new LrcWord { Time = ParseTime(wordMatch, offsetMs), Text = segment });
                     }
+                    totalWords += parsedWords.Count;
+                    if (totalWords > ExternalHttp.MaxLyricWords)
+                    {
+                        Log.Write("lrc: demasiadas palabras");
+                        return new List<LrcLine>();
+                    }
                     if (parsedWords.Count > 0) words = parsedWords;
                 }
             }
 
             foreach (Match m in lineMatches)
             {
+                if (lines.Count >= MaxLines)
+                {
+                    Log.Write("lrc: demasiadas líneas");
+                    return new List<LrcLine>();
+                }
                 lines.Add(new LrcLine { Time = ParseTime(m, offsetMs), Text = text, Words = words });
             }
         }
@@ -82,8 +118,8 @@ public static class LrcParser
 
     static double ParseTime(Match m, int offsetMs)
     {
-        var minutes = int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
-        var seconds = int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
+        var minutes = Math.Min(int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture), MaxMinutes);
+        var seconds = Math.Min(int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture), 59);
         double fraction = 0;
         if (m.Groups[3].Success)
         {
@@ -91,6 +127,6 @@ public static class LrcParser
         }
 
         var time = minutes * 60 + seconds + fraction + offsetMs / 1000.0;
-        return time < 0 ? 0 : time;
+        return Math.Clamp(time, 0, MaxTimeSeconds);
     }
 }

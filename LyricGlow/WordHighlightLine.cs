@@ -99,7 +99,7 @@ public sealed class WordHighlightLine
                     var motion = new WordMotion(child);
                     if (Style == WordAnimationStyle.Blur)
                     {
-                        motion.Blur = new BlurEffect { Radius = 0, RenderingBias = RenderingBias.Quality };
+                        motion.Blur = new BlurEffect { Radius = 0, RenderingBias = RenderingBias.Performance };
                         child.Effect = motion.Blur;
                     }
                     _motions.Add(motion);

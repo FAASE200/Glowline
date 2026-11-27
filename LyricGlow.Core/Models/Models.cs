@@ -23,12 +23,18 @@ public static class TrackKey
 {
     public static string Make(string artist, string title, double? durationSeconds)
     {
-        var d = durationSeconds is > 0 ? ((int)Math.Round(durationSeconds.Value)).ToString() : "0";
+        var d = durationSeconds is > 0 and < 86400
+            ? ((int)Math.Round(durationSeconds.Value)).ToString()
+            : "0";
         return $"{Normalize(artist)}|{Normalize(title)}|{d}";
     }
 
-    public static string Normalize(string? s) =>
-        Regex.Replace((s ?? "").Trim().ToLowerInvariant(), @"\s+", " ");
+    public static string Normalize(string? s)
+    {
+        var text = s ?? "";
+        if (text.Length > 1024) text = text[..1024];
+        return Regex.Replace(text.Trim().ToLowerInvariant(), @"\s+", " ");
+    }
 }
 
 public sealed class LrcLine
@@ -97,7 +103,7 @@ public sealed class AppSettings
     public Dictionary<string, int> PerTrackOffsetMs { get; set; } = new();
     public Dictionary<string, long> ManualOverrides { get; set; } = new();
     public string? PreferredSourceAppId { get; set; }
-    public bool SoftwareRendering { get; set; } = true;
+    public bool SoftwareRendering { get; set; }
     public bool CoverPaletteEnabled { get; set; } = true;
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public InterfaceTheme InterfaceTheme { get; set; } = InterfaceTheme.Dark;
@@ -118,7 +124,7 @@ public sealed class AppSettings
     public string LyricsFontWeight { get; set; } = "SemiBold";
     public int AnimationSoftness { get; set; } = 50;
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public AppLanguage Language { get; set; } = AppLanguage.Spanish;
+    public AppLanguage Language { get; set; } = AppLanguage.English;
     public DesignProfile? ActiveDesign { get; set; }
     public int MobilePresetIndex { get; set; } = 1;
 }

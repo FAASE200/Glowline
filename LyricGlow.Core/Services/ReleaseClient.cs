@@ -13,16 +13,34 @@ using System.Threading.Tasks;
 namespace LyricGlow.Services;
 
 public sealed record ReleaseAsset(string Name, long Id, long Size, string? Digest, string? DownloadUrl = null);
-public sealed record ReleaseInfo(Version Version, string Tag, IReadOnlyList<ReleaseAsset> Assets, string? HtmlUrl);
+public sealed record ReleaseInfo(
+    Version Version,
+    string Tag,
+    IReadOnlyList<ReleaseAsset> Assets,
+    string? HtmlUrl,
+    string? Notes = null);
 
 public sealed class ReleaseClient
 {
     public const string Owner = "FAASE200";
     public const string Repo = "Glowline";
+    public const string RepoUrl = "https://github.com/" + Owner + "/" + Repo;
+    public const long MaxDownloadBytes = 1L * 1024 * 1024 * 1024;
+    public const int MaxNotesChars = 32 * 1024;
+    const int MaxAssets = 64;
+    const int MaxNameChars = 256;
+    const int MaxTagChars = 64;
+    const long MaxApiJsonBytes = 4L * 1024 * 1024;
+    const long MaxManifestBytes = 1L * 1024 * 1024;
 
-    const string WebBase = "https://github.com/" + Owner + "/" + Repo;
+    const string WebBase = RepoUrl;
     const string ApiBase = "https://api.github.com/repos/" + Owner + "/" + Repo;
     const string ManifestUrl = WebBase + "/releases/latest/download/manifest.json";
+
+    static readonly ExternalHostPolicy WebHosts =
+        ExternalHostPolicy.Of("github.com", "githubusercontent.com");
+    static readonly ExternalHostPolicy ApiHosts =
+        ExternalHostPolicy.Of("api.github.com", "github.com", "githubusercontent.com");
 
     readonly HttpClient _api;
     readonly HttpClient _downloads;
@@ -33,13 +51,13 @@ public sealed class ReleaseClient
         _downloads = BuildClient(TimeSpan.FromMinutes(20), json: false);
     }
 
-    HttpClient BuildClient(TimeSpan timeout, bool json)
+    static HttpClient BuildClient(TimeSpan timeout, bool json)
     {
-        var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = true }) { Timeout = timeout };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("Glowline-Updater/2.0");
+        var client = ExternalHttp.CreateClient(timeout, "Glowline-Updater/2.0");
         if (json)
         {
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+            client.DefaultRequestHeaders.Accept.Add(
+                new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
             client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
         }
         return client;
@@ -56,12 +74,17 @@ public sealed class ReleaseClient
     {
         try
         {
-            using var response = await _downloads.GetAsync(ManifestUrl, HttpCompletionOption.ResponseHeadersRead, ct);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(TimeSpan.FromSeconds(30));
+            using var response = await ExternalHttp.SendAsync(
+                _downloads, WebHosts.Require(ManifestUrl), WebHosts, timeout.Token);
             if (!response.IsSuccessStatusCode) return null;
-            var json = await response.Content.ReadAsStringAsync(ct);
+            ExternalHttp.EnsureContentType(response,
+                "application/json", "text/json", "text/plain", "application/octet-stream");
+            var json = await ExternalHttp.ReadStringAsync(response, MaxManifestBytes, timeout.Token);
             return ParseManifest(json);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
@@ -73,39 +96,68 @@ public sealed class ReleaseClient
 
     async Task<ReleaseInfo?> GetLatestFromApiAsync(CancellationToken ct)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, ApiBase + "/releases/latest");
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-        request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
-        using var response = await _api.SendAsync(request, ct);
+        using var response = await ExternalHttp.SendAsync(
+            _api, ApiHosts.Require(ApiBase + "/releases/latest"), ApiHosts, ct);
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
-        var json = await response.Content.ReadAsStringAsync(ct);
-        using var doc = JsonDocument.Parse(json);
+        using var doc = await ExternalHttp.ReadJsonAsync(response, MaxApiJsonBytes, ct);
         var root = doc.RootElement;
-        var tag = GetString(root, "tag_name");
+        if (root.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException("Respuesta de GitHub inesperada.");
+
+        var tag = ExternalHttp.CleanText(GetString(root, "tag_name"), MaxTagChars);
         var version = ParseVersion(tag);
         if (version is null) throw new InvalidDataException($"Versión de release no reconocida: {tag}");
         var assets = new List<ReleaseAsset>();
         if (root.TryGetProperty("assets", out var nodes) && nodes.ValueKind == JsonValueKind.Array)
         {
+            var count = 0;
             foreach (var item in nodes.EnumerateArray())
             {
+                if (++count > MaxAssets) throw new InvalidDataException("Demasiados assets en la release.");
+                if (item.ValueKind != JsonValueKind.Object) continue;
+                var name = ExternalHttp.CleanText(GetString(item, "name"), MaxNameChars);
+                if (name.Length == 0) continue;
+                var size = item.TryGetProperty("size", out var sizeNode) &&
+                           sizeNode.TryGetInt64(out var bytes) && bytes is >= 0 and <= MaxDownloadBytes
+                    ? bytes : 0;
                 assets.Add(new ReleaseAsset(
-                    GetString(item, "name"),
+                    name,
                     item.TryGetProperty("id", out var id) && id.TryGetInt64(out var value) ? value : 0,
-                    item.TryGetProperty("size", out var size) && size.TryGetInt64(out var bytes) ? bytes : 0,
-                    GetNullableString(item, "digest")));
+                    size,
+                    ExternalHttp.CleanText(GetNullableString(item, "digest"), 128)));
             }
         }
-        return new ReleaseInfo(version, tag, assets, GetNullableString(root, "html_url"));
+        var html = ExternalHttp.CleanText(GetNullableString(root, "html_url"), 512);
+        if (html.Length > 0 && (!Uri.TryCreate(html, UriKind.Absolute, out var htmlUri) ||
+                                !WebHosts.Allows(htmlUri)))
+            html = "";
+        return new ReleaseInfo(version, tag, assets, html.Length > 0 ? html : null, ReadNotes(root));
+    }
+
+    public async Task<string> GetReleaseNotesAsync(string tag, CancellationToken ct = default)
+    {
+        var cleanTag = ExternalHttp.CleanText(tag, MaxTagChars);
+        if (cleanTag.Length == 0) return "";
+        using var response = await ExternalHttp.SendAsync(
+            _api,
+            ApiHosts.Require(ApiBase + "/releases/tags/" + Uri.EscapeDataString(cleanTag)),
+            ApiHosts,
+            ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return "";
+        using var doc = await ExternalHttp.ReadJsonAsync(response, MaxApiJsonBytes, ct).ConfigureAwait(false);
+        return doc.RootElement.ValueKind == JsonValueKind.Object ? ReadNotes(doc.RootElement) : "";
     }
 
     public static ReleaseInfo ParseManifest(string json)
     {
-        using var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json, ExternalHttp.JsonOptions);
         var root = doc.RootElement;
-        var tag = GetStringAny(root, "tag", "tag_name").Trim();
-        var versionText = GetStringAny(root, "version", "tag");
+        if (root.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException("Manifest sin objeto raíz.");
+
+        var tag = ExternalHttp.CleanText(GetStringAny(root, "tag", "tag_name"), MaxTagChars);
+        var versionText = ExternalHttp.CleanText(GetStringAny(root, "version", "tag"), MaxTagChars);
         var version = ParseVersion(versionText) ?? ParseVersion(tag);
         if (version is null) throw new InvalidDataException($"Versión de manifest no reconocida: {versionText}");
         if (tag.Length == 0) tag = "v" + Format(version);
@@ -113,29 +165,30 @@ public sealed class ReleaseClient
         var assets = new List<ReleaseAsset>();
         if (root.TryGetProperty("assets", out var nodes) && nodes.ValueKind == JsonValueKind.Array)
         {
+            if (nodes.GetArrayLength() > MaxAssets)
+                throw new InvalidDataException("Demasiados assets en el manifest.");
             foreach (var item in nodes.EnumerateArray())
             {
-                var name = GetStringAny(item, "Name", "name");
+                if (item.ValueKind != JsonValueKind.Object) continue;
+                var name = ExternalHttp.CleanText(GetStringAny(item, "Name", "name"), MaxNameChars);
                 if (name.Length == 0) continue;
-                var sha = GetStringAny(item, "Sha256", "sha256", "Digest", "digest");
+                var sha = ExternalHttp.CleanText(
+                    GetStringAny(item, "Sha256", "sha256", "Digest", "digest"), 128);
                 var digest = IsSha256Digest(sha)
                     ? (sha.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase)
                         ? sha.ToLowerInvariant()
                         : "sha256:" + sha.ToLowerInvariant())
                     : null;
+                var size = GetInt64Any(item, "Size", "size");
+                if (size is < 0 or > MaxDownloadBytes) size = 0;
                 var url = WebBase + "/releases/download/" +
                           Uri.EscapeDataString(tag) + "/" + Uri.EscapeDataString(name);
-                assets.Add(new ReleaseAsset(
-                    name,
-                    0,
-                    GetInt64Any(item, "Size", "size"),
-                    digest,
-                    url));
+                assets.Add(new ReleaseAsset(name, 0, size, digest, url));
             }
         }
 
         var html = WebBase + "/releases/tag/" + Uri.EscapeDataString(tag);
-        return new ReleaseInfo(version, tag, assets, html);
+        return new ReleaseInfo(version, tag, assets, html, ReadNotes(root));
     }
 
     public ReleaseAsset? FindAsset(ReleaseInfo release, params string[] names)
@@ -156,26 +209,44 @@ public sealed class ReleaseClient
         Directory.CreateDirectory(directory);
         var part = destination + ".part";
         var direct = !string.IsNullOrWhiteSpace(asset.DownloadUrl);
-        using var request = new HttpRequestMessage(HttpMethod.Get,
-            direct ? asset.DownloadUrl! : ApiBase + "/releases/assets/" + asset.Id);
-        if (!direct)
+        var policy = direct ? WebHosts : ApiHosts;
+        var uri = policy.Require(direct ? asset.DownloadUrl! : ApiBase + "/releases/assets/" + asset.Id);
+        var client = _downloads;
+        using var response = await ExternalHttp.SendAsync(client, uri, policy, ct, request =>
+        {
+            if (direct) return;
+            // La API de assets devuelve metadatos JSON si no se pide el binario.
+            request.Headers.Accept.Clear();
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/octet-stream"));
-        using var response = await _downloads.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        }).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
+        ExternalHttp.EnsureContentType(response,
+            "application/octet-stream", "binary/octet-stream", "application/x-msdownload",
+            "application/vnd.microsoft.portable-executable", "application/zip",
+            "application/vnd.android.package-archive");
+
         var total = response.Content.Headers.ContentLength ?? asset.Size;
+        if (total > MaxDownloadBytes || (asset.Size > 0 && total > asset.Size + 1024 * 1024))
+            throw new InvalidDataException("El instalador excede el tamaño permitido.");
         double reported = 0;
+        long readTotal = 0;
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         await using (var input = await response.Content.ReadAsStreamAsync(ct))
         await using (var output = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
         {
             var buffer = new byte[81920];
-            long readTotal = 0;
             int read;
             while ((read = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
             {
+                readTotal += read;
+                if (readTotal > MaxDownloadBytes)
+                {
+                    output.Close();
+                    try { File.Delete(part); } catch { }
+                    throw new InvalidDataException("El instalador excede el tamaño permitido.");
+                }
                 await output.WriteAsync(buffer.AsMemory(0, read), ct);
                 hash.AppendData(buffer, 0, read);
-                readTotal += read;
                 var value = total > 0 ? Math.Clamp((double)readTotal / total, 0, 1) : 0;
                 if (value - reported >= 0.02 || value >= 1)
                 {
@@ -183,6 +254,11 @@ public sealed class ReleaseClient
                     progress?.Invoke(value);
                 }
             }
+        }
+        if (asset.Size > 0 && readTotal != asset.Size)
+        {
+            try { File.Delete(part); } catch { }
+            throw new InvalidDataException("El tamaño descargado no coincide con el publicado.");
         }
         var hex = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
         if (!DigestMatches(asset.Digest, hex))
@@ -214,6 +290,20 @@ public sealed class ReleaseClient
         IsSha256Digest(digest) &&
         string.Equals(digest!.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase) ? digest[7..] : digest,
             hash, StringComparison.OrdinalIgnoreCase);
+
+    static string ReadNotes(JsonElement root)
+    {
+        var raw = GetStringAny(root, "notes", "changelog", "releaseNotes", "release_notes", "body");
+        if (raw.Length == 0) return "";
+        var text = raw.Replace("\r\n", "\n").Replace('\r', '\n').Replace('\0', ' ').Trim();
+        if (text.Length > MaxNotesChars)
+        {
+            var limit = MaxNotesChars;
+            if (char.IsHighSurrogate(text[limit - 1]) && char.IsLowSurrogate(text[limit])) limit--;
+            text = text[..limit].TrimEnd();
+        }
+        return text;
+    }
 
     static string GetString(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";

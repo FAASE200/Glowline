@@ -42,7 +42,7 @@ public partial class App : Application
         var dataDirOverride = Environment.GetEnvironmentVariable("LYRICGLOW_DATA_DIR");
         if (!string.IsNullOrWhiteSpace(dataDirOverride))
             StoragePaths.DataDirectory = dataDirOverride;
-        Loc.Initialize(AppLanguage.Spanish);
+        Loc.Initialize(AppLanguage.English);
 
         var applyTarget = GetArgValue(e.Args, "--apply-update");
         if (!string.IsNullOrEmpty(applyTarget))
@@ -122,13 +122,27 @@ public partial class App : Application
         Settings = new SettingsService();
         ThemePaletteService.SetInterfaceTheme(Settings.Settings.InterfaceTheme);
         ThemePaletteService.SetEnabled(Settings.Settings.CoverPaletteEnabled);
+        var migrated = false;
         if (Settings.Settings.SchemaVersion < 3)
         {
             if (Settings.Settings.LyricsSource != LyricSource.Lrclib)
                 Settings.Settings.LyricsSource = LyricSource.Lrcmux;
             Settings.Settings.SchemaVersion = 3;
-            Settings.Save();
+            migrated = true;
         }
+        if (Settings.Settings.SchemaVersion < 4)
+        {
+            // La versión anterior activaba el render por software por defecto,
+            // que en la mayoría de equipos solo reduce los fotogramas.
+            if (Settings.Settings.SoftwareRendering)
+            {
+                Settings.Settings.SoftwareRendering = false;
+                Log.Write("settings: render por software desactivado en la migración");
+            }
+            Settings.Settings.SchemaVersion = 4;
+            migrated = true;
+        }
+        if (migrated) Settings.Save();
 
         Loc.SetLanguage(Settings.Settings.Language);
         var qaLanguage = Environment.GetEnvironmentVariable("LYRICGLOW_QA_LANG");
@@ -504,6 +518,16 @@ public partial class App : Application
             SnapshotWindow(MainWindowRef!, Path.Combine(dir, "main.png"), Color.FromRgb(0x0A, 0x0A, 0x0C));
             SnapshotWindow(fullscreen, Path.Combine(dir, "fullscreen.png"), Colors.Black);
 
+            fullscreen.DebugSetPlaying(true, animate: false);
+            await Task.Delay(120);
+            SnapshotWindow(fullscreen, Path.Combine(dir, "fullscreen-pause.png"), Colors.Black);
+            fullscreen.DebugSetChrome(false);
+            await Task.Delay(140);
+            SnapshotWindow(fullscreen, Path.Combine(dir, "fullscreen-chrome-hiding.png"), Colors.Black);
+            fullscreen.DebugSetChrome(true);
+            await Task.Delay(380);
+            fullscreen.DebugSetPlaying(false, animate: false);
+
             if (!string.IsNullOrWhiteSpace(fusionProbeArt) && File.Exists(fusionProbeArt))
             {
                 fullscreen.DebugApplyArt(File.ReadAllBytes(fusionProbeArt));
@@ -542,6 +566,17 @@ public partial class App : Application
             MainWindowRef.DebugScrollToEnd();
             await Task.Delay(500);
             SnapshotWindow(MainWindowRef, Path.Combine(dir, "main-840-bottom.png"), Color.FromRgb(0x0A, 0x0A, 0x0C));
+
+            MainWindowRef.DebugShowUpdateNotes("0.9.22", """
+                - Release notes now appear before installing an update.
+                - New "Star on GitHub" button opens the public repository.
+                - Update checks keep the notes visible while the installer downloads,
+                  even when a long line needs to wrap inside the panel.
+                - Download failures no longer hide the changes for the target version.
+                """);
+            await Task.Delay(600);
+            SnapshotWindow(MainWindowRef, Path.Combine(dir, "main-updates.png"), Color.FromRgb(0x0A, 0x0A, 0x0C));
+            MainWindowRef.DebugHideUpdateNotes();
 
             MainWindowRef.DebugScrollToDesigner();
             await Task.Delay(350);

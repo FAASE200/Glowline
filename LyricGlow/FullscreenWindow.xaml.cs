@@ -819,13 +819,21 @@ public partial class FullscreenWindow : Window
         var target = Math.Clamp(design.Background.Dim, 0, 1);
         BackdropImage.BeginAnimation(OpacityProperty, null);
         BackdropImage.Opacity = target;
+
         var blur = design.Background.Kind == BackgroundKind.CoverBlur
             ? Math.Clamp(design.Background.Blur, 0, 200)
             : 0;
-        if (blur > 0)
+        var coverSource = CoverA.Source as BitmapSource ?? CoverB.Source as BitmapSource;
+        if (coverSource is not null)
         {
-            BackdropImage.Effect = new BlurEffect { Radius = blur, RenderingBias = RenderingBias.Performance };
-            LightBackdropImage.Effect = new BlurEffect { Radius = blur, RenderingBias = RenderingBias.Performance };
+            // El desenfoque se hornea en la miniatura 256x144: aplicarlo en vivo
+            // sobre la ventana completa cuesta GPU en cada fotograma sin verse mejor.
+            var backdrop = CreateBackdrop(coverSource, blur);
+            if (backdrop is not null)
+            {
+                BackdropImage.Source = backdrop;
+                LightBackdropImage.Source = backdrop;
+            }
         }
 
         EnsureLightBackdrop();
@@ -840,7 +848,9 @@ public partial class FullscreenWindow : Window
         var source = CoverA.Source as BitmapSource ?? CoverB.Source as BitmapSource;
         if (source is not null)
             LightBackdropImage.Source = CreateBackdrop(source,
-                App.Designs.Active.Background.Kind == BackgroundKind.CoverBlur);
+                App.Designs.Active.Background.Kind == BackgroundKind.CoverBlur
+                    ? App.Designs.Active.Background.Blur
+                    : 0);
     }
 
     void UpdateDesignControls()
@@ -881,11 +891,25 @@ public partial class FullscreenWindow : Window
         DarkCoverMask.BorderBrush = new SolidColorBrush(fusion ? _fusionBackground : _customAccent);
         var shadow = fusion || a.ShadowOpacity <= 0
             ? null
-            : new DropShadowEffect { BlurRadius = 55, ShadowDepth = 16, Opacity = a.ShadowOpacity, Color = Colors.Black };
+            : new DropShadowEffect
+            {
+                BlurRadius = 55,
+                ShadowDepth = 16,
+                Opacity = a.ShadowOpacity,
+                Color = Colors.Black,
+                RenderingBias = RenderingBias.Performance,
+            };
         LightCoverBorder.Effect = shadow;
         DarkCoverBorder.Effect = a.Fusion || a.ShadowOpacity <= 0
             ? null
-            : new DropShadowEffect { BlurRadius = 70, ShadowDepth = 20, Opacity = a.ShadowOpacity, Color = Colors.Black };
+            : new DropShadowEffect
+            {
+                BlurRadius = 70,
+                ShadowDepth = 20,
+                Opacity = a.ShadowOpacity,
+                Color = Colors.Black,
+                RenderingBias = RenderingBias.Performance,
+            };
         UpdateCoverClips();
     }
 
@@ -1058,6 +1082,20 @@ public partial class FullscreenWindow : Window
     }
 
     public void DebugApplyArt(byte[] bytes) => ApplyArtBytes(bytes);
+
+    public void DebugSetPlaying(bool playing, bool animate)
+    {
+        DarkPlayPauseIcon.Animate = animate;
+        LightPlayPauseIcon.Animate = animate;
+        DarkPlayPauseIcon.Playing = playing;
+        LightPlayPauseIcon.Playing = playing;
+    }
+
+    public void DebugSetChrome(bool visible)
+    {
+        if (visible) WakeChrome();
+        else HideChrome();
+    }
 
     public void DebugSetAnimatedReady(bool ready)
     {
@@ -1339,18 +1377,54 @@ public partial class FullscreenWindow : Window
     {
         var controls = App.Designs.Active.Controls;
         var present = controls.ShowTransport || controls.ShowProgress;
-        var enabled = visible && present;
-        DarkTransport.BeginAnimation(OpacityProperty, null);
-        DarkTransport.Visibility = present ? Visibility.Visible : Visibility.Collapsed;
-        DarkTransport.Opacity = enabled ? 1 : 0;
-        DarkTransport.IsHitTestVisible = enabled && controls.ShowTransport;
-        DarkTransport.IsEnabled = enabled && controls.ShowTransport;
+        AnimateTransport(DarkTransport, DarkTransportShift, present, visible, controls.ShowTransport);
+        AnimateTransport(LightTransport, LightTransportShift, present, visible, controls.ShowTransport);
+    }
 
-        LightTransport.BeginAnimation(OpacityProperty, null);
-        LightTransport.Visibility = present ? Visibility.Visible : Visibility.Collapsed;
-        LightTransport.Opacity = enabled ? 1 : 0;
-        LightTransport.IsHitTestVisible = enabled && controls.ShowTransport;
-        LightTransport.IsEnabled = enabled && controls.ShowTransport;
+    static void AnimateTransport(
+        FrameworkElement transport, TranslateTransform shift, bool present, bool visible, bool enabled)
+    {
+        var active = present && visible;
+        var interactive = active && enabled;
+        var targetOpacity = active ? 1.0 : 0.0;
+        var targetY = active ? 0.0 : 7.0;
+
+        if (!present)
+        {
+            transport.BeginAnimation(OpacityProperty, null);
+            shift.BeginAnimation(TranslateTransform.YProperty, null);
+            transport.Opacity = 0;
+            shift.Y = 7;
+            transport.Visibility = Visibility.Collapsed;
+            transport.IsHitTestVisible = false;
+            transport.IsEnabled = false;
+            return;
+        }
+
+        transport.Visibility = Visibility.Visible;
+        transport.IsHitTestVisible = interactive;
+        transport.IsEnabled = interactive;
+        if (Math.Abs(transport.Opacity - targetOpacity) < 0.001 &&
+            Math.Abs(shift.Y - targetY) < 0.001)
+            return;
+
+        var duration = active
+            ? TimeSpan.FromMilliseconds(240)
+            : TimeSpan.FromMilliseconds(320);
+        var ease = new CubicEase
+        {
+            EasingMode = active ? EasingMode.EaseOut : EasingMode.EaseIn,
+        };
+        transport.BeginAnimation(OpacityProperty,
+            new DoubleAnimation(transport.Opacity, targetOpacity, duration)
+            {
+                EasingFunction = ease,
+            });
+        shift.BeginAnimation(TranslateTransform.YProperty,
+            new DoubleAnimation(shift.Y, targetY, duration)
+            {
+                EasingFunction = ease,
+            });
     }
 
     void OnSnapshot(SessionSnapshot snap)
@@ -2115,7 +2189,9 @@ public partial class FullscreenWindow : Window
 
         CoverPlaceholder.Visibility = Visibility.Collapsed;
 
-        var backdrop = CreateBackdrop(bmp, App.Designs.Active.Background.Kind == BackgroundKind.CoverBlur);
+        var backdrop = CreateBackdrop(bmp, App.Designs.Active.Background.Kind == BackgroundKind.CoverBlur
+            ? App.Designs.Active.Background.Blur
+            : 0);
         if (backdrop is not null)
         {
             var background = App.Designs.Active.Background;
@@ -2144,10 +2220,11 @@ public partial class FullscreenWindow : Window
         }
     }
 
-    static BitmapSource? CreateBackdrop(BitmapSource source, bool blurred = true)
+    static BitmapSource? CreateBackdrop(BitmapSource source, double blur)
     {
         try
         {
+            var blurred = blur > 0;
             var w = blurred ? 256 : 512;
             var h = blurred ? 144 : 288;
             var visual = new DrawingVisual();
@@ -2168,10 +2245,11 @@ public partial class FullscreenWindow : Window
 
             if (blurred)
             {
+                var radius = Math.Clamp((int)Math.Round(blur * 10.0 / 55.0), 1, 30);
                 for (var pass = 0; pass < 2; pass++)
                 {
-                    BlurAxis(pixels, buffer, w, h, 10, horizontal: true);
-                    BlurAxis(buffer, pixels, w, h, 10, horizontal: false);
+                    BlurAxis(pixels, buffer, w, h, radius, horizontal: true);
+                    BlurAxis(buffer, pixels, w, h, radius, horizontal: false);
                 }
             }
 
@@ -2536,9 +2614,12 @@ public partial class FullscreenWindow : Window
 
     void UpdateTransport()
     {
-        var glyph = _media.LastSnapshot?.IsPlaying == true ? "⏸" : "▶";
-        PlayPauseButton.Content = glyph;
-        LightPlayPauseButton.Content = glyph;
+        var playing = _media.LastSnapshot?.IsPlaying == true;
+        var animate = !App.Designs.Active.ReduceMotion;
+        DarkPlayPauseIcon.Animate = animate;
+        LightPlayPauseIcon.Animate = animate;
+        DarkPlayPauseIcon.Playing = playing;
+        LightPlayPauseIcon.Playing = playing;
     }
 
     void RebuildLyrics(bool animate)
@@ -2873,7 +2954,7 @@ public partial class FullscreenWindow : Window
 
     void OnFrame(object? sender, EventArgs e)
     {
-        if (!_isOpen || !IsVisible) return;
+        if (!_isOpen || !IsVisible || WindowState == WindowState.Minimized) return;
 
         var now = DateTime.Now;
         if (RenderOptions.ProcessRenderMode == RenderMode.SoftwareOnly &&
@@ -3027,8 +3108,8 @@ public partial class FullscreenWindow : Window
         var darkWidth = ProgressTrack.ActualWidth;
         if (darkWidth > 1)
         {
-            ProgressFill.Width = duration is > 0
-                ? darkWidth * Math.Clamp(pos / duration.Value, 0, 1)
+            ProgressFillScale.ScaleX = duration is > 0
+                ? Math.Clamp(pos / duration.Value, 0, 1)
                 : 0;
             if (DurText.Text != durationText) DurText.Text = durationText;
         }
@@ -3036,8 +3117,8 @@ public partial class FullscreenWindow : Window
         var lightWidth = LightProgressTrack.ActualWidth;
         if (lightWidth > 1)
         {
-            LightProgressFill.Width = duration is > 0
-                ? lightWidth * Math.Clamp(pos / duration.Value, 0, 1)
+            LightProgressFillScale.ScaleX = duration is > 0
+                ? Math.Clamp(pos / duration.Value, 0, 1)
                 : 0;
             if (LightDurText.Text != durationText) LightDurText.Text = durationText;
         }

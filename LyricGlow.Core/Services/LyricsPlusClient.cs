@@ -17,18 +17,26 @@ namespace LyricGlow.Services;
 public sealed class LyricsPlusClient
 {
     const string BaseUrl = "https://lyricsplus.prjktla.my.id";
+    const int MaxLines = 2000;
+    const int MaxSyllablesPerLine = 200;
+    const int MaxTextChars = 4096;
+    const int MaxSyllableChars = 512;
+    const int MaxMetaChars = 512;
+    const int MaxSongWriters = 50;
+    const double MaxDurationSeconds = 24 * 60 * 60;
+    const double MaxTimeMs = MaxDurationSeconds * 1000;
 
+    static readonly ExternalHostPolicy Hosts = ExternalHostPolicy.Of("lyricsplus.prjktla.my.id");
     static readonly HttpClient Http = CreateClient();
-    static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        MaxDepth = ExternalHttp.MaxJsonDepth,
+    };
     static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
 
-    static HttpClient CreateClient()
-    {
-        var http = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("LyricGlow/0.9 (synchronized lyrics)");
-        http.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-        return http;
-    }
+    static HttpClient CreateClient() =>
+        ExternalHttp.CreateClient(TimeSpan.FromSeconds(25), "LyricGlow/0.9 (synchronized lyrics)",
+            "application/json");
 
     public async Task<LrclibTrack?> GetAsync(
         string title, string artist, string? album, double? durationSeconds, CancellationToken ct)
@@ -37,17 +45,19 @@ public sealed class LyricsPlusClient
 
         var parts = new List<string>
         {
-            $"title={Uri.EscapeDataString(ClampQueryValue(title))}",
-            $"artist={Uri.EscapeDataString(ClampQueryValue(artist))}",
+            $"title={Uri.EscapeDataString(ExternalHttp.ClampQueryValue(title))}",
+            $"artist={Uri.EscapeDataString(ExternalHttp.ClampQueryValue(artist))}",
         };
-        if (!string.IsNullOrWhiteSpace(album)) parts.Add($"album={Uri.EscapeDataString(ClampQueryValue(album))}");
-        if (durationSeconds is > 0) parts.Add($"duration={(int)Math.Round(durationSeconds.Value)}");
+        if (!string.IsNullOrWhiteSpace(album))
+            parts.Add($"album={Uri.EscapeDataString(ExternalHttp.ClampQueryValue(album))}");
+        if (durationSeconds is > 0 and < 86400) parts.Add($"duration={(int)Math.Round(durationSeconds.Value)}");
 
         var url = BaseUrl + "/v2/lyrics/get?" + string.Join("&", parts);
 
         try
         {
-            using var response = await Http.GetAsync(url, ct);
+            var uri = Hosts.Require(url);
+            using var response = await ExternalHttp.SendAsync(Http, uri, Hosts, ct);
             if (response.StatusCode == HttpStatusCode.NotFound) return null;
             if (response.StatusCode == (HttpStatusCode)429)
             {
@@ -60,8 +70,11 @@ public sealed class LyricsPlusClient
                 return null;
             }
 
-            var json = await response.Content.ReadAsStringAsync(ct);
-            var payload = JsonSerializer.Deserialize<ApiResponse>(json, JsonOptions);
+            using var doc = await ExternalHttp.ReadJsonAsync(response, ExternalHttp.MaxJsonBytes, ct);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                throw new ExternalDataException("LyricsPlus devolvió un objeto inesperado.");
+
+            var payload = doc.RootElement.Deserialize<ApiResponse>(JsonOptions);
             return ToTrack(payload, title, artist);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
@@ -76,16 +89,26 @@ public sealed class LyricsPlusClient
         }
     }
 
-    internal static LrclibTrack? TrackFromJson(string json, string fallbackTitle, string fallbackArtist) =>
-        ToTrack(JsonSerializer.Deserialize<ApiResponse>(json, JsonOptions), fallbackTitle, fallbackArtist);
+    internal static LrclibTrack? TrackFromJson(string json, string fallbackTitle, string fallbackArtist)
+    {
+        using var doc = JsonDocument.Parse(json, ExternalHttp.JsonOptions);
+        if (doc.RootElement.ValueKind != JsonValueKind.Object) return null;
+        return ToTrack(doc.RootElement.Deserialize<ApiResponse>(JsonOptions), fallbackTitle, fallbackArtist);
+    }
 
     static LrclibTrack? ToTrack(ApiResponse? response, string fallbackTitle, string fallbackArtist)
     {
         if (response?.Lyrics is not { Count: > 0 } lyricEntries) return null;
+        if (lyricEntries.Count > MaxLines)
+        {
+            Log.Write($"LyricsPlus: {lyricEntries.Count} líneas exceden el límite");
+            return null;
+        }
 
         var metadata = response.Metadata;
+        var songWriters = CleanWriters(metadata?.SongWriters);
         var lines = lyricEntries
-            .Where(line => line is not null)
+            .Where(line => line is not null && IsLineValid(line))
             .Select((line, index) => (line, index))
             .Where(entry => !IsCreditLine(
                 entry.line.Text,
@@ -93,21 +116,33 @@ public sealed class LyricsPlusClient
                 entry.index,
                 FirstNonEmpty(metadata?.Title, fallbackTitle),
                 FirstNonEmpty(metadata?.Artist, fallbackArtist),
-                metadata?.SongWriters))
+                songWriters))
             .OrderBy(entry => entry.line.Time)
             .ThenBy(entry => entry.index)
             .Select(entry => entry.line)
             .ToList();
+        if (lines.Count == 0) return null;
+        if (lines.Sum(line => line.Syllabus?.Count ?? 0) > ExternalHttp.MaxLyricWords)
+        {
+            Log.Write("LyricsPlus: demasiadas sílabas");
+            return null;
+        }
 
         var synced = BuildSyncedLyrics(lines);
         var plain = BuildPlainLyrics(lines);
+        if (synced.Length > ExternalHttp.MaxLyricsChars ||
+            !ExternalHttp.LyricsTextOk(plain, out _))
+        {
+            Log.Write("LyricsPlus: letra excede el límite");
+            return null;
+        }
         if (synced.Length == 0 && plain.Length == 0) return null;
 
         var track = new LrclibTrack
         {
             TrackName = FirstNonEmpty(metadata?.Title, fallbackTitle),
             ArtistName = FirstNonEmpty(metadata?.Artist, fallbackArtist),
-            AlbumName = metadata?.Album ?? "",
+            AlbumName = ExternalHttp.CleanText(metadata?.Album, MaxMetaChars),
             Duration = ParseDuration(metadata?.TotalDuration, response.ProcessingTime?.SelectedSongMetadata?.Duration),
             Source = SourceLabel(response),
         };
@@ -123,6 +158,37 @@ public sealed class LyricsPlusClient
         }
 
         return track;
+    }
+
+    static List<string>? CleanWriters(List<string>? writers)
+    {
+        if (writers is not { Count: > 0 }) return null;
+        var result = new List<string>(Math.Min(writers.Count, MaxSongWriters));
+        foreach (var writer in writers)
+        {
+            if (result.Count >= MaxSongWriters) break;
+            var text = ExternalHttp.CleanText(writer, MaxMetaChars);
+            if (text.Length > 0) result.Add(text);
+        }
+        return result.Count > 0 ? result : null;
+    }
+
+    static bool IsLineValid(Line line)
+    {
+        if (!ExternalHttp.IsFiniteInRange(line.Time, 0, MaxTimeMs)) return false;
+        if (!ExternalHttp.IsFiniteInRange(line.Duration, 0, MaxTimeMs)) return false;
+        if (line.Text is { Length: > MaxTextChars }) return false;
+        if (line.Syllabus is not { Count: > 0 } syllables) return true;
+        if (syllables.Count > MaxSyllablesPerLine) return false;
+
+        foreach (var syllable in syllables)
+        {
+            if (syllable is null) return false;
+            if (!ExternalHttp.IsFiniteInRange(syllable.Time, 0, MaxTimeMs)) return false;
+            if (!ExternalHttp.IsFiniteInRange(syllable.Duration, 0, MaxTimeMs)) return false;
+            if (syllable.Text is { Length: > MaxSyllableChars }) return false;
+        }
+        return true;
     }
 
     static string BuildSyncedLyrics(IReadOnlyList<Line> lines)
@@ -276,28 +342,35 @@ public sealed class LyricsPlusClient
     {
         var parsed = ParseSeconds(totalDuration);
         if (parsed is > 0) return parsed;
-        return fallbackSeconds is > 0 ? fallbackSeconds : null;
+        return fallbackSeconds is { } fallback &&
+               ExternalHttp.IsFiniteInRange(fallback, 0, MaxDurationSeconds) && fallback > 0
+            ? fallback
+            : null;
     }
 
     static double? ParseSeconds(string? value)
     {
         value = Normalize(value);
-        if (value.Length == 0) return null;
+        if (value.Length == 0 || value.Length > 64) return null;
 
         if (value.Contains(':'))
         {
             var parts = value.Split(':');
+            if (parts.Length > 4) return null;
             double total = 0;
             foreach (var part in parts)
             {
                 if (!double.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out var component))
                     return null;
+                if (!ExternalHttp.IsFiniteInRange(component, 0, MaxDurationSeconds)) return null;
                 total = total * 60 + component;
+                if (total > MaxDurationSeconds) return null;
             }
             return total;
         }
 
-        return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds)
+        return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) &&
+               ExternalHttp.IsFiniteInRange(seconds, 0, MaxDurationSeconds)
             ? seconds
             : null;
     }
@@ -353,7 +426,7 @@ public sealed class LyricsPlusClient
     static string Compact(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return "";
-        var result = new StringBuilder(value.Length);
+        var result = new StringBuilder(Math.Min(value.Length, MaxTextChars));
         foreach (var ch in value)
         {
             if (char.IsLetterOrDigit(ch)) result.Append(char.ToLowerInvariant(ch));
@@ -361,25 +434,24 @@ public sealed class LyricsPlusClient
         return result.ToString();
     }
 
-    static string FirstNonEmpty(params string?[] values) =>
-        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? "";
-
-    static string ClampQueryValue(string value)
+    static string FirstNonEmpty(params string?[] values)
     {
-        if (value.Length <= 500) return value;
-        var limit = 500;
-        if (char.IsHighSurrogate(value[limit - 1]) && char.IsLowSurrogate(value[limit])) limit--;
-        return value[..limit];
+        foreach (var value in values)
+        {
+            var text = ExternalHttp.CleanText(value, MaxMetaChars);
+            if (text.Length > 0) return text;
+        }
+        return "";
     }
 
     static string Normalize(string? value) => Whitespace.Replace(value ?? "", " ").Trim();
 
     static long TimeMs(double value) =>
-        double.IsFinite(value) ? Math.Max(0, (long)Math.Round(value, MidpointRounding.AwayFromZero)) : 0;
+        double.IsFinite(value) ? (long)Math.Clamp(Math.Round(value, MidpointRounding.AwayFromZero), 0, MaxTimeMs) : 0;
 
     static string Stamp(long milliseconds)
     {
-        milliseconds = Math.Max(0, milliseconds);
+        milliseconds = Math.Clamp(milliseconds, 0, (long)MaxTimeMs);
         var centiseconds = (long)Math.Round(milliseconds / 10.0, MidpointRounding.AwayFromZero);
         var minutes = centiseconds / 6000;
         centiseconds %= 6000;

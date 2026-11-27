@@ -32,6 +32,12 @@ public sealed class LyricsService
         public LrclibTrack? Track { get; set; }
     }
 
+    const long MaxCacheBytes = 4L * 1024 * 1024;
+    static readonly JsonSerializerOptions CacheJsonOptions = new()
+    {
+        MaxDepth = ExternalHttp.MaxJsonDepth,
+    };
+
     static readonly Regex FeatSuffix = new(
         @"\s*[\(\[](?:feat|ft|with)\.?\s[^\)\]]*[\)\]]",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -514,6 +520,7 @@ public sealed class LyricsService
         var now = DateTimeOffset.Now;
         var playing = snap.IsPlaying;
         var target = snap.PositionSeconds + (playing ? Math.Max(0, (now - snap.CapturedAt).TotalSeconds) : 0);
+        if (!double.IsFinite(target)) target = 0;
 
         if (_seekTarget >= 0)
         {
@@ -679,7 +686,9 @@ public sealed class LyricsService
         try
         {
             var entry = new CacheEntry { Version = 2, FetchedAtUtc = DateTime.UtcNow, Track = track };
-            File.WriteAllText(CachePath(key), JsonSerializer.Serialize(entry));
+            var json = JsonSerializer.Serialize(entry);
+            if (json.Length > MaxCacheBytes) return;
+            File.WriteAllText(CachePath(key), json);
         }
         catch (Exception ex)
         {
@@ -693,9 +702,13 @@ public sealed class LyricsService
         {
             var path = CachePath(key);
             if (!File.Exists(path)) return null;
-            var entry = JsonSerializer.Deserialize<CacheEntry>(File.ReadAllText(path));
+            var info = new FileInfo(path);
+            if (info.Length <= 0 || info.Length > MaxCacheBytes) return null;
+            var entry = JsonSerializer.Deserialize<CacheEntry>(
+                File.ReadAllBytes(path), CacheJsonOptions);
             if (entry?.Track is null || entry.Version < 2) return null;
             if (DateTime.UtcNow - entry.FetchedAtUtc > TimeSpan.FromDays(14)) return null;
+            if (!LrcLibClient.ValidateTrack(entry.Track)) return null;
             return entry.Track;
         }
         catch

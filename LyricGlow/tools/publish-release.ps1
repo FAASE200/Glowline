@@ -1,6 +1,8 @@
 param(
     [string]$Version,
     [string]$PublishDir,
+    [string]$PortableExe,
+    [string]$PortableAssetName,
     [string]$AndroidApk,
     [string]$AndroidAssetName,
     [string]$NotesPath,
@@ -30,7 +32,17 @@ if (-not $AndroidApk) {
                   elseif (Test-Path -LiteralPath $plainApk) { $plainApk }
                   else { $debugApk }
 }
-$androidName = if ($AndroidAssetName) { $AndroidAssetName } else { Split-Path -Leaf $AndroidApk }
+$androidName = if ($AndroidAssetName) { $AndroidAssetName } else { "Glowline-$Version-android-unstable.apk" }
+
+if (-not $PortableExe) {
+    $portableCandidates = @(
+        (Join-Path $publishDir "Glowline-$Version-final.exe"),
+        (Join-Path $publishDir "Glowline-$Version.exe"),
+        (Join-Path $publishDir "LyricGlow.exe")
+    )
+    $PortableExe = $portableCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+}
+$portableName = if ($PortableAssetName) { $PortableAssetName } else { "Glowline-$Version-portable.exe" }
 
 function Get-PublishToken {
     $plain = Join-Path $root '.secrets\publish.token'
@@ -93,9 +105,11 @@ if ($repoInfo.permissions) {
 
 $assetsToUpload = @(
     [pscustomobject]@{ Name = "LyricGlowSetup-$Version.exe"; Path = (Join-Path $publishDir "LyricGlowSetup-$Version.exe"); Platform = 'windows-x64' }
+    [pscustomobject]@{ Name = $portableName; Path = $PortableExe; Platform = 'windows-x64-portable' }
+    [pscustomobject]@{ Name = $androidName; Path = $AndroidApk; Platform = 'android-unstable' }
 )
 foreach ($asset in $assetsToUpload) {
-    if (-not (Test-Path -LiteralPath $asset.Path)) {
+    if (-not $asset.Path -or -not (Test-Path -LiteralPath $asset.Path)) {
         throw "Falta $($asset.Path). Ejecuta dotnet publish y tools\build-installers.ps1."
     }
     $asset | Add-Member -NotePropertyName Size -NotePropertyValue (Get-Item -LiteralPath $asset.Path).Length

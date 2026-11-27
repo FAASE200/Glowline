@@ -13,7 +13,7 @@
     <Label X="104" Y="28" Width="150" Height="30" FontId="1" Visible="yes">Glowline</Label>
     <Label X="104" Y="58" Width="150" Height="20" FontId="2" Visible="yes">Windows installer</Label>
     <Label X="28" Y="160" Width="214" Height="96" FontId="1" Visible="yes">Synced music lyrics for everyone.</Label>
-    <Label X="28" Y="474" Width="214" Height="36" FontId="2" Visible="yes">Version 0.9.18 &#183; Windows x64</Label>
+    <Label X="28" Y="474" Width="214" Height="36" FontId="2" Visible="yes">Version [WixBundleVersion] &#183; Windows x64</Label>
 
     <Page Name="Loading">
       <Label X="306" Y="48" Width="440" Height="40" FontId="3">Preparing Glowline</Label>
