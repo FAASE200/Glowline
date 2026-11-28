@@ -65,6 +65,9 @@ public sealed class LyricsService
     Dictionary<string, string> ManualPins =>
         _settings.Settings.ManualPins ??= new Dictionary<string, string>();
     IReadOnlyList<LrcLine> _sourceLines = Array.Empty<LrcLine>();
+    IReadOnlyList<string>? _translations;
+    string _translationsLanguage = "";
+    CancellationTokenSource? _translateCts;
     long _resolveGeneration;
     SessionSnapshot? _snapshot;
     string _currentKey = "";
@@ -222,6 +225,8 @@ public sealed class LyricsService
         {
             var fresh = await FindAsync(primary, track, ct);
             if (fresh is not null) found = fresh;
+            // Offline or the service is down: an old copy is better than nothing.
+            else if (!ignoreCache && found is null) found = LoadCache(cacheKey, allowStale: true);
         }
 
         Log.Write(found is null
@@ -364,7 +369,9 @@ public sealed class LyricsService
             if (lines.Count > 1)
             {
                 _sourceLines = lines;
+                _translations = null;
                 SetState(LyricsState.Synced, BuildDisplayLines(track), null, found, note);
+                StartTranslation(track);
                 return;
             }
         }
@@ -381,7 +388,12 @@ public sealed class LyricsService
     void SetState(LyricsState state, IReadOnlyList<LrcLine> lines, string? plain,
         LrclibTrack? found, string? noteKey = null, bool noUsableLines = false)
     {
-        if (state != LyricsState.Synced) _sourceLines = Array.Empty<LrcLine>();
+        if (state != LyricsState.Synced)
+        {
+            _sourceLines = Array.Empty<LrcLine>();
+            _translations = null;
+            _translateCts?.Cancel();
+        }
         State = state;
         Lines = lines;
         PlainLyrics = plain;
@@ -660,11 +672,67 @@ public sealed class LyricsService
     {
         var source = _sourceLines;
         LineOffsets.TryGetValue(track.Key, out var offsets);
-        return BuildDisplayLines(source, offsets, _settings.Settings.RomanizationEnabled);
+        var s = _settings.Settings;
+        var translations = s.TranslationEnabled &&
+                           _translationsLanguage == TranslationService.LanguageCode(s.Language)
+            ? _translations
+            : null;
+        return BuildDisplayLines(source, offsets, s.RomanizationEnabled, translations);
+    }
+
+    /// <summary>
+    /// Call after turning translation on or off, or changing the app
+    /// language: fetches the translation if it is needed and redraws.
+    /// </summary>
+    public void RefreshTranslation()
+    {
+        if (Track is null || State != LyricsState.Synced) return;
+        if (_settings.Settings.TranslationEnabled) StartTranslation(Track);
+        else _translateCts?.Cancel();
+        RefreshDisplayLines();
+    }
+
+    void StartTranslation(TrackInfo track)
+    {
+        var settings = _settings.Settings;
+        if (!settings.TranslationEnabled || _sourceLines.Count == 0) return;
+        var language = TranslationService.LanguageCode(settings.Language);
+        if (_translations is not null && _translationsLanguage == language) return;
+
+        _translateCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _translateCts = cts;
+        var source = _sourceLines;
+        var texts = new List<string>(source.Count);
+        foreach (var line in source) texts.Add(line.Text.Length > 0 ? line.Text : line.Background);
+        _ = ApplyTranslationAsync(track, source, texts, language, cts);
+    }
+
+    async Task ApplyTranslationAsync(TrackInfo track, IReadOnlyList<LrcLine> source,
+        List<string> texts, string language, CancellationTokenSource cts)
+    {
+        try
+        {
+            var result = await TranslationService.TranslateAsync(track.Key, texts, language, cts.Token);
+            // Another song or new lyrics arrived while it was working.
+            if (cts.IsCancellationRequested || !ReferenceEquals(source, _sourceLines)) return;
+            if (result is null) return;
+            _translations = result;
+            _translationsLanguage = language;
+            RefreshDisplayLines();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Log.Write("translation: " + ex.Message);
+        }
     }
 
     internal static IReadOnlyList<LrcLine> BuildDisplayLines(
-        IReadOnlyList<LrcLine> source, IReadOnlyDictionary<string, int>? offsets, bool romanize)
+        IReadOnlyList<LrcLine> source, IReadOnlyDictionary<string, int>? offsets, bool romanize,
+        IReadOnlyList<string>? translations = null)
     {
         var result = new List<LrcLine>(source.Count);
         for (var i = 0; i < source.Count; i++)
@@ -691,6 +759,7 @@ public sealed class LyricsService
                 Words = Shift(line.Words, delta),
                 BackgroundWords = Shift(line.BackgroundWords, delta),
                 Romanized = romanize ? Romanizer.Romanize(line.Text) : "",
+                Translation = translations is not null && i < translations.Count ? translations[i] : "",
                 SourceTime = baseTime,
             });
         }
@@ -920,6 +989,8 @@ public sealed class LyricsService
 
     internal const int MaxCachedLyrics = 2000;
     static readonly TimeSpan CacheLifetime = TimeSpan.FromDays(14);
+    // Old copies are kept longer than they are trusted, for when there is no internet.
+    static readonly TimeSpan StaleLifetime = TimeSpan.FromDays(90);
     static int _savesSincePrune = int.MaxValue / 2;
 
     // The lyrics cache used to grow forever. Every so many writes, expired
@@ -928,7 +999,7 @@ public sealed class LyricsService
     {
         if (Interlocked.Increment(ref _savesSincePrune) < 50) return;
         Interlocked.Exchange(ref _savesSincePrune, 0);
-        _ = Task.Run(() => PruneCache(StoragePaths.CacheDirectory, MaxCachedLyrics, CacheLifetime, DateTime.UtcNow));
+        _ = Task.Run(() => PruneCache(StoragePaths.CacheDirectory, MaxCachedLyrics, StaleLifetime, DateTime.UtcNow));
     }
 
     internal static int PruneCache(string directory, int maxFiles, TimeSpan lifetime, DateTime nowUtc)
@@ -971,7 +1042,7 @@ public sealed class LyricsService
     }
 
 
-    LrclibTrack? LoadCache(string key)
+    LrclibTrack? LoadCache(string key, bool allowStale = false)
     {
         try
         {
@@ -982,7 +1053,7 @@ public sealed class LyricsService
             var entry = JsonSerializer.Deserialize<CacheEntry>(
                 File.ReadAllBytes(path), CacheJsonOptions);
             if (entry?.Track is null || entry.Version < 2) return null;
-            if (DateTime.UtcNow - entry.FetchedAtUtc > CacheLifetime) return null;
+            if (!allowStale && DateTime.UtcNow - entry.FetchedAtUtc > CacheLifetime) return null;
             if (!LrcLibClient.ValidateTrack(entry.Track)) return null;
             return entry.Track;
         }

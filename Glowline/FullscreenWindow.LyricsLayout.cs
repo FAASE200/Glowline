@@ -132,6 +132,8 @@ public partial class FullscreenWindow
                 _wordFade)
             {
                 BackgroundColor = _backgroundVocal,
+                // Backing vocals used to light up in plain white, invisible on light backgrounds.
+                BackgroundBrightColor = _wordBright,
                 Style = MapWordAnimation(App.Designs.Active.Animations.WordAnimation),
                 MotionStrength = Math.Clamp(App.Designs.Active.Animations.WordIntensity, 0, 1),
             };

@@ -95,6 +95,8 @@
             <Image x:Name="LightBackdropA" Aspect="AspectFill" Opacity="0" />
             <Image x:Name="LightBackdropB" Aspect="AspectFill" Opacity="0" />
             <Border x:Name="LightScrim" StrokeThickness="0" BackgroundColor="Transparent" />
+            <!-- Soft glow of the cover's accent color, like the desktop's light layout. -->
+            <Border x:Name="LightGlow" StrokeThickness="0" InputTransparent="True" />
 
             <Grid x:Name="LightContent" Padding="18,54,18,10" RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="8">
                 <Border x:Name="LightCoverBorder" WidthRequest="168" HeightRequest="168"
@@ -121,6 +123,26 @@
                            HorizontalTextAlignment="Center" MaxLines="1" LineBreakMode="TailTruncation" />
                 </VerticalStackLayout>
 
+                <!-- The lyrics start right under the title and run behind the controls, which are
+                     drawn after them; before, the invisible controls kept that space empty
+                     and the current line ended up in the lower half of the screen. -->
+                <Grid x:Name="LightLyricsHost" Grid.Row="2" Grid.RowSpan="2" IsClippedToBounds="True">
+                    <Grid x:Name="LightVerseLayer">
+                        <Grid x:Name="LightScrollLayer" VerticalOptions="Start">
+                            <VerticalStackLayout x:Name="LightLyricsStack" Spacing="24" />
+                        </Grid>
+                    </Grid>
+                    <ScrollView x:Name="LightPlainScroll" IsVisible="False">
+                        <Label x:Name="LightPlainLabel" FontSize="18" LineHeight="1.5" TextColor="#55555C"
+                               LineBreakMode="WordWrap" />
+                    </ScrollView>
+                    <Label x:Name="LightStatusLabel" IsVisible="False" FontSize="19" TextColor="#55555C"
+                           HorizontalTextAlignment="Center" VerticalOptions="Center" LineBreakMode="WordWrap"
+                           HorizontalOptions="Center" MaximumWidthRequest="520" />
+                    <HorizontalStackLayout x:Name="LightDotsRow" IsVisible="False" Spacing="10"
+                                           HorizontalOptions="Center" VerticalOptions="Center" />
+                </Grid>
+
                 <VerticalStackLayout x:Name="LightTransport" Grid.Row="2" Spacing="6" Margin="0,2,0,0">
                     <HorizontalStackLayout x:Name="LightTransportButtons" HorizontalOptions="Center" Spacing="16">
                         <Button x:Name="LightPreviousButton" Text="⏮" FontSize="16" WidthRequest="42" HeightRequest="42"
@@ -139,23 +161,6 @@
                                VerticalOptions="Center" />
                     </Grid>
                 </VerticalStackLayout>
-
-                <Grid x:Name="LightLyricsHost" Grid.Row="3" IsClippedToBounds="True">
-                    <Grid x:Name="LightVerseLayer">
-                        <Grid x:Name="LightScrollLayer" VerticalOptions="Start">
-                            <VerticalStackLayout x:Name="LightLyricsStack" Spacing="24" />
-                        </Grid>
-                    </Grid>
-                    <ScrollView x:Name="LightPlainScroll" IsVisible="False">
-                        <Label x:Name="LightPlainLabel" FontSize="18" LineHeight="1.5" TextColor="#55555C"
-                               LineBreakMode="WordWrap" />
-                    </ScrollView>
-                    <Label x:Name="LightStatusLabel" IsVisible="False" FontSize="19" TextColor="#55555C"
-                           HorizontalTextAlignment="Center" VerticalOptions="Center" LineBreakMode="WordWrap"
-                           HorizontalOptions="Center" MaximumWidthRequest="520" />
-                    <HorizontalStackLayout x:Name="LightDotsRow" IsVisible="False" Spacing="10"
-                                           HorizontalOptions="Center" VerticalOptions="Center" />
-                </Grid>
             </Grid>
 
             <Grid x:Name="LightChrome" ColumnDefinitions="44,*,44" ColumnSpacing="8" Margin="18,8,18,0"

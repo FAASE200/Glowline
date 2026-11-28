@@ -869,6 +869,9 @@ public partial class FullscreenWindow : Window
             (now - _lastFrame).TotalMilliseconds < 33)
             return;
 
+        // Paused: nothing moves much, so there's no need to run at monitor speed.
+        if (!_lyrics.IsPlaying && (now - _lastFrame).TotalMilliseconds < 50) return;
+
         var dt = (now - _lastFrame).TotalSeconds;
         _lastFrame = now;
         if (dt <= 0 || dt > 0.25) dt = 0.016;

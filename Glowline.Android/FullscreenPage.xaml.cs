@@ -54,10 +54,13 @@ public partial class FullscreenPage : ContentPage
     const double ArtFadeMilliseconds = 460;
     const double InterludeGap = 34;
     const double ChromeIdleSeconds = 2.6;
+    // About 60 frames per second: a tick costs about 1 ms, and 30 fps looked slow on
+    // phones with 90 or 120 Hz screens.
+    static readonly TimeSpan FastInterval = TimeSpan.FromMilliseconds(16);
     static readonly double[] DotLightAt = { 0.3, 0.6, 0.9 };
     static readonly Color BackgroundVocal = Color.FromRgba(255, 255, 255, 0x80);
 
-    readonly IDispatcherTimer _timer;
+    readonly FrameTimer _timer;
     readonly ParticleField _particles = new();
     readonly List<DotsView> _dots = new();
     readonly List<LineView> _lines = new();
@@ -176,8 +179,8 @@ public partial class FullscreenPage : ContentPage
         LightLyricsHost.SizeChanged += (_, __) => OnHostResized();
         SizeChanged += (_, __) => OnPageResized();
 
-        _timer = Dispatcher.CreateTimer();
-        _timer.Interval = TimeSpan.FromMilliseconds(33);
+        _timer = new FrameTimer();
+        _timer.Interval = FastInterval;
         _timer.Tick += (_, __) => Tick();
     }
 
@@ -277,8 +280,8 @@ public partial class FullscreenPage : ContentPage
     void RequestActiveTick()
     {
         _tickFast = true;
-        if (_timer.Interval != TimeSpan.FromMilliseconds(33))
-            _timer.Interval = TimeSpan.FromMilliseconds(33);
+        if (_timer.Interval != FastInterval)
+            _timer.Interval = FastInterval;
         if (_loaded && !_timer.IsRunning) _timer.Start();
     }
 
@@ -418,9 +421,9 @@ public partial class FullscreenPage : ContentPage
     void Tick()
     {
         if (!_loaded) return;
-        var dt = _lastTick == DateTime.MinValue ? 0.033 : (DateTime.Now - _lastTick).TotalSeconds;
+        var dt = _lastTick == DateTime.MinValue ? 0.016 : (DateTime.Now - _lastTick).TotalSeconds;
         _lastTick = DateTime.Now;
-        if (dt <= 0 || dt > 0.5) dt = 0.033;
+        if (dt <= 0 || dt > 0.5) dt = 0.016;
 
         if (DateTime.Now >= _nextDesignCheck)
         {
@@ -441,6 +444,7 @@ public partial class FullscreenPage : ContentPage
             MeasureAll();
             _scrollInit = false;
         }
+        if (synced) SyncHeightsFromLayout();
         if (synced) UpdateLyrics(dt);
         else ResetPerformanceState();
 
@@ -454,7 +458,9 @@ public partial class FullscreenPage : ContentPage
             UpdateClock(force: false);
         }
         UpdateTickRate();
+
     }
+
 
     void UpdateTickRate()
     {
@@ -466,7 +472,7 @@ public partial class FullscreenPage : ContentPage
             || motion || ParticleView.IsVisible;
         if (fast == _tickFast) return;
         _tickFast = fast;
-        _timer.Interval = TimeSpan.FromMilliseconds(fast ? 33 : 200);
+        _timer.Interval = fast ? FastInterval : TimeSpan.FromMilliseconds(200);
     }
 
     void EnsureLyricsState()
@@ -778,6 +784,14 @@ public partial class FullscreenPage : ContentPage
         LightStatusLabel.TextColor = _statusText;
 
         LightScrim.BackgroundColor = WithAlpha(background, 0x8C);
+        LightGlow.Background = new RadialGradientBrush(
+            new GradientStopCollection
+            {
+                new GradientStop(WithAlpha(_paletteAccent, 0x4A), 0f),
+                new GradientStop(WithAlpha(_paletteAccent, 0x1C), 0.55f),
+                new GradientStop(WithAlpha(_paletteAccent, 0x00), 1f),
+            },
+            new Point(0.5, 0.64), 0.78);
         var dotColor = _customPalette ? _customText : _centered ? _palettePrimary : Colors.White;
         foreach (var dots in _dots)
         {
@@ -822,7 +836,9 @@ public partial class FullscreenPage : ContentPage
         var fusionArtwork = artwork.Fusion ||
                             (_centered && design.Palette.CoverFusion && !_customPalette && State.CoverPalette.Detected);
         var radius = fusionArtwork ? 0 : artwork.CornerRadius;
-        var thickness = fusionArtwork ? 2 : artwork.BorderThickness;
+        // Fusion covers have no frame: the old 2 dp ring in the background color showed up
+        // as a light outline because the page background is a gradient, not a flat color.
+        var thickness = fusionArtwork ? 0 : artwork.BorderThickness;
         var borderColor = fusionArtwork ? _paletteBackground : _customPalette ? _customAccent : _paletteAccent;
         var shadow = fusionArtwork || artwork.ShadowOpacity <= 0
             ? null
@@ -1020,7 +1036,9 @@ public partial class FullscreenPage : ContentPage
             Place(LightCoverBorder, 0, 0);
             Place(LightMeta, 1, 0);
             Place(LightTransport, 2, 0);
-            Place(LightLyricsHost, 3, 0);
+            // The lyrics start right under the title and run behind the controls (which are
+            // drawn after them), so the area isn't pushed down by controls that are usually hidden.
+            Place(LightLyricsHost, 2, 0, rowSpan: 2);
 
             SetColumns(DarkHeader, GridLength.Auto, GridLength.Star);
             SetRows(DarkHeader, GridLength.Star);
@@ -1271,8 +1289,39 @@ public partial class FullscreenPage : ContentPage
             HorizontalOptions = LayoutOptions.Fill,
         };
         views = new List<WordView>(words.Count);
-        foreach (var word in words)
+        // Some sources time a word in pieces (syllables). Pieces of one word are glued
+        // together without a gap and wrap as a unit; only whole words get a space.
+        var gaps = WordSpacing.GapAfter(words);
+        var piece = new List<Label>();
+        void Flush()
         {
+            if (piece.Count == 0) return;
+            // A flex item shrinks when its line is full, and a label that shrinks cuts off
+            // its last letter ("qu e guardi n t"). Words must keep their full width.
+            if (piece.Count == 1)
+            {
+                piece[0].Margin = new Thickness(0, 0, 5, 0);
+                FlexLayout.SetShrink(piece[0], 0f);
+                row.Children.Add(piece[0]);
+            }
+            else
+            {
+                var group = new HorizontalStackLayout
+                {
+                    Spacing = 0,
+                    Margin = new Thickness(0, 0, 5, 0),
+                    VerticalOptions = LayoutOptions.Center,
+                };
+                foreach (var part in piece) group.Children.Add(part);
+                FlexLayout.SetShrink(group, 0f);
+                row.Children.Add(group);
+            }
+            piece.Clear();
+        }
+
+        for (var i = 0; i < words.Count; i++)
+        {
+            var word = words[i];
             var text = word.Text.TrimEnd();
             if (text.Length == 0) text = " ";
             var label = new Label
@@ -1283,7 +1332,6 @@ public partial class FullscreenPage : ContentPage
                 FontAutoScalingEnabled = false,
                 TextColor = dim,
                 LineBreakMode = LineBreakMode.NoWrap,
-                Margin = new Thickness(0, 0, 5, 0),
                 VerticalOptions = LayoutOptions.Center,
             };
             var view = new WordView { Label = label, Time = word.Time };
@@ -1292,9 +1340,12 @@ public partial class FullscreenPage : ContentPage
                 view.Lit = true;
                 label.TextColor = bright;
             }
-            row.Children.Add(label);
+            piece.Add(label);
             views.Add(view);
+
+            if (gaps[i]) Flush();
         }
+        Flush();
         return row;
     }
 
@@ -1371,7 +1422,7 @@ public partial class FullscreenPage : ContentPage
         }
         else if (line.BackgroundWords is { Count: > 0 })
         {
-            var row = MakeWordLayout(line.BackgroundWords, _vocal, Colors.White, position, animateWords, out var words);
+            var row = MakeWordLayout(line.BackgroundWords, _vocal, _wordBright, position, animateWords, out var words);
             if (view.Backing is null)
             {
                 view.Backing = row;
@@ -1438,6 +1489,25 @@ public partial class FullscreenPage : ContentPage
         if (Math.Abs(scroll.HeightRequest - total) > 0.5) scroll.HeightRequest = total;
     }
 
+    /// <summary>
+    /// The lines are centered from their heights added up. The heights measured
+    /// before layout can be smaller than what is really drawn (wrapping, fonts that
+    /// load late), and the error adds up line after line, so the current line drifted
+    /// toward the bottom. The real height of each line, once drawn, replaces them.
+    /// </summary>
+    void SyncHeightsFromLayout()
+    {
+        var changed = false;
+        foreach (var view in _lines)
+        {
+            var real = view.Root.Height;
+            if (real <= 1 || Math.Abs(real - view.Height) <= 0.5) continue;
+            view.Height = real;
+            changed = true;
+        }
+        if (changed) UpdateStackHeight();
+    }
+
     void RemeasureLine(int index)
     {
         if (index < 0 || index >= _lines.Count) return;
@@ -1464,6 +1534,7 @@ public partial class FullscreenPage : ContentPage
         if (index != _currentLine) ApplyCurrentLine(index, position, immediate: false);
         if (!intro) UpdateWordPaint(position);
 
+        UpdateChromeShift(dt);
         if (_hostHeight > 1)
         {
             var target = CenterTarget();
@@ -1473,7 +1544,9 @@ public partial class FullscreenPage : ContentPage
                 _scrollInit = true;
             }
             var diff = target - _scrollOffset;
-            var rate = Math.Max(5, 18 - Math.Clamp(State.Settings.AnimationSoftness, 0, 100) * 0.12);
+            // Faster follow than before: the scroll caught up to the new line too slowly.
+            // At the default softness the scroll covers 90% of the way in about 90 ms.
+            var rate = Math.Max(14, 34 - Math.Clamp(State.Settings.AnimationSoftness, 0, 100) * 0.2);
             _scrollOffset += Math.Abs(diff) < 0.3 ? diff : diff * (1 - Math.Exp(-rate * dt));
             _scrollDiff = Math.Abs(target - _scrollOffset);
             ApplyScroll();
@@ -1526,9 +1599,11 @@ public partial class FullscreenPage : ContentPage
             var top = y + GapShift(i) + _scrollOffset;
             var height = view.Height;
             var center = top + height / 2;
-            var distance = Math.Abs(center - _hostHeight / 2);
+            var distance = Math.Abs(center - AnchorY);
             var fade = Math.Clamp(1 - distance / (_hostHeight * 0.42), 0, 1);
-            var opacity = intro ? inactive * fade : i == index ? fade : inactive * fade;
+            // The new current line lights up right away; it used to brighten only as the
+            // scroll brought it to its place, which felt like the change was slow.
+            var opacity = intro ? inactive * fade : i == index ? Math.Max(fade, 0.9) : inactive * fade;
             if (Math.Abs(view.Root.Opacity - opacity) > 0.003) view.Root.Opacity = opacity;
             var interactive = !intro && opacity > 0.05;
             if (view.Root.InputTransparent != !interactive) view.Root.InputTransparent = !interactive;
@@ -1541,7 +1616,7 @@ public partial class FullscreenPage : ContentPage
         if (_currentLine < 0 || _currentLine >= _lines.Count) return;
         var view = _lines[_currentLine];
         PaintWords(view.Words, position, _wordDim, _wordBright, motion: true);
-        PaintWords(view.BackWords, position, _vocal, Colors.White, motion: false);
+        PaintWords(view.BackWords, position, _vocal, _wordBright, motion: false);
     }
 
     void PaintWords(List<WordView> words, double position, Color dim, Color bright, bool motion)
@@ -1719,12 +1794,31 @@ public partial class FullscreenPage : ContentPage
     double GapShift(int index) =>
         _gapLine >= 0 && index > _gapLine ? InterludeGap * _gap : 0;
 
+    /// <summary>
+    /// Where the current line sits in the lyrics area. The exact middle looked like it
+    /// sank toward the bottom of the screen, because on a tall phone the lyrics area
+    /// starts well below the top (cover, title and controls come first). A bit above
+    /// the middle leaves room to read the lines that come next.
+    /// </summary>
+    double AnchorY => _hostHeight * (_centered ? 0.34 : 0.42) + _chromeShift;
+
+    // While the controls are on screen they cover the top of the lyrics area, so the
+    // lyrics move down by their height and come back up when the controls fade out.
+    double _chromeShift;
+
+    void UpdateChromeShift(double dt)
+    {
+        var target = _centered && !_wide && _chromeVisible ? LightTransport.Height + 8 : 0;
+        var next = _chromeShift + (target - _chromeShift) * (1 - Math.Exp(-14 * dt));
+        _chromeShift = Math.Abs(target - next) < 0.2 ? target : next;
+    }
+
     double CenterTarget()
     {
         var index = _currentLine;
         if (index < 0 && _lines.Count > 0) index = 0;
         if (index < 0 || index >= _lines.Count) return 0;
-        return _hostHeight / 2 - (TopOf(index) + _lines[index].Height / 2) +
+        return AnchorY - (TopOf(index) + _lines[index].Height / 2) +
                Design.Lyrics.VerticalOffset;
     }
 

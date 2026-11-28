@@ -33,6 +33,7 @@ static class OverlayPage
   .artist { font-size: calc(var(--size) * .34); opacity: .75; margin-top: 2px; }
   .line { font-size: var(--size); font-weight: 700; line-height: 1.18; text-align: var(--align);
           transition: opacity .25s ease, transform .25s ease; min-height: 1.2em; }
+  .trans { font-size: calc(var(--size) * .45); opacity: .78; text-align: var(--align); margin-top: 6px; }
   .roman { font-size: calc(var(--size) * .45); font-style: italic; opacity: .78; text-align: var(--align); margin-top: 6px; }
   .next { font-size: calc(var(--size) * .48); opacity: .5; text-align: var(--align); margin-top: 10px; }
   .fade { opacity: 0; transform: translateY(8px); }
@@ -50,6 +51,7 @@ static class OverlayPage
   </div>
   <div class="line" id="line"></div>
   <div class="roman hidden" id="roman"></div>
+  <div class="trans hidden" id="trans"></div>
   <div class="next" id="next"></div>
 </div>
 <script>
@@ -96,6 +98,8 @@ static class OverlayPage
       }
       setText(el("roman"), s.romanized || "");
       el("roman").classList.toggle("hidden", !s.romanized);
+      setText(el("trans"), s.translation || "");
+      el("trans").classList.toggle("hidden", !s.translation);
       setText(el("next"), showNext ? (s.next || "") : "");
     } catch (e) {
       // Glowline is closed: retry silently.

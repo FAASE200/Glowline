@@ -52,6 +52,8 @@ public sealed class LrcLine
     public IReadOnlyList<LrcWord>? BackgroundWords { get; init; }
     /// <summary>Pronunciation in Latin letters (empty when not applicable).</summary>
     public string Romanized { get; init; } = "";
+    /// <summary>Translation into the app language (empty when off or not needed).</summary>
+    public string Translation { get; init; } = "";
     /// <summary>Original time from the source, before per-line adjustments.</summary>
     public double SourceTime { get; init; } = double.NaN;
 }
@@ -153,4 +155,14 @@ public sealed class AppSettings
     public bool ObsOverlayEnabled { get; set; }
     public int ObsOverlayPort { get; set; } = 7531;
     public bool DiscordPresenceEnabled { get; set; }
+
+    // ---- 0.9.41 ----
+    /// <summary>Show the current lyric line in the Discord status.</summary>
+    public bool DiscordShowLyrics { get; set; }
+    /// <summary>Translate the lyrics into the app language (sends the text to Google Translate).</summary>
+    public bool TranslationEnabled { get; set; }
+    /// <summary>Look of the share image: 0 cover, 1 gradient, 2 light.</summary>
+    public int ShareStyle { get; set; }
+    /// <summary>Shape of the share image: 0 portrait 4:5, 1 story 9:16, 2 square 1:1.</summary>
+    public int ShareFormat { get; set; }
 }

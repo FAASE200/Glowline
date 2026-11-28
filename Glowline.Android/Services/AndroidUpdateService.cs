@@ -30,7 +30,7 @@ public sealed class AndroidUpdateService
 
     public event Action? Changed;
     public AppVersion CurrentVersion { get; }
-    public long CurrentVersionCode => long.TryParse(AppInfo.Current.BuildString, out var code) ? code : 0;
+    public long CurrentVersionCode => long.TryParse(Microsoft.Maui.ApplicationModel.AppInfo.Current.BuildString, out var code) ? code : 0;
     public string CurrentVersionText => CurrentVersion.ToString(3);
     public AppVersion? AvailableVersion { get; private set; }
     public bool IsBusy { get; private set; }
@@ -43,7 +43,7 @@ public sealed class AndroidUpdateService
     {
         _settings = settings;
         _client = new ReleaseClient();
-        var current = AppInfo.Current.Version;
+        var current = Microsoft.Maui.ApplicationModel.AppInfo.Current.Version;
         CurrentVersion = new AppVersion(current.Major, current.Minor, current.Build < 0 ? 0 : current.Build);
     }
 

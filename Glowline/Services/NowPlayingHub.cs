@@ -26,7 +26,9 @@ public sealed class NowPlayingHub : IDisposable
         string Next,
         bool HasLyrics,
         long CoverVersion,
-        string CoverUrl = "");
+        string CoverUrl = "",
+        string Player = "",
+        string Translation = "");
 
     readonly DispatcherTimer _timer;
     readonly OverlayServer _overlay = new();
@@ -37,6 +39,7 @@ public sealed class NowPlayingHub : IDisposable
     string _coverUrl = "";
     long _coverVersion;
     Snapshot? _last;
+    bool _discordLyrics;
 
     public NowPlayingHub()
     {
@@ -53,6 +56,12 @@ public sealed class NowPlayingHub : IDisposable
     {
         _overlay.SetEnabled(settings.ObsOverlayEnabled, settings.ObsOverlayPort);
         var discordWasEnabled = _discord.IsEnabled;
+        if (_discordLyrics != settings.DiscordShowLyrics)
+        {
+            _discordLyrics = settings.DiscordShowLyrics;
+            _discord.ShowLyrics = _discordLyrics;
+            _last = null; // send the status again with or without the line
+        }
         _discord.SetEnabled(settings.DiscordPresenceEnabled);
         // Turning Discord on mid-song: look the cover up again to get its address.
         if (_discord.IsEnabled && !discordWasEnabled) _coverKey = "";
@@ -80,7 +89,7 @@ public sealed class NowPlayingHub : IDisposable
 
         if (track.Key != _coverKey) RefreshCover(track);
 
-        string line = "", romanized = "", next = "";
+        string line = "", romanized = "", translation = "", next = "";
         var hasLyrics = lyrics.State == LyricsState.Synced && lyrics.Lines.Count > 0;
         var position = lyrics.GetDisplayPosition();
         if (hasLyrics)
@@ -91,12 +100,14 @@ public sealed class NowPlayingHub : IDisposable
             {
                 line = lines[index].Text.Length > 0 ? lines[index].Text : lines[index].Background;
                 romanized = lines[index].Romanized;
+                translation = lines[index].Translation;
             }
             if (index + 1 < lines.Count) next = lines[index + 1].Text;
         }
 
         Publish(new Snapshot(track.Key, track.Title, track.Artist, track.Album, lyrics.IsPlaying,
-            position, track.DurationSeconds, line, romanized, next, hasLyrics, _coverVersion, _coverUrl));
+            position, track.DurationSeconds, line, romanized, next, hasLyrics, _coverVersion, _coverUrl,
+            PlayerNames.Friendly(track.SourceAppId), translation));
     }
 
     void Publish(Snapshot snapshot)
@@ -111,7 +122,9 @@ public sealed class NowPlayingHub : IDisposable
                              last.Artist != snapshot.Artist ||
                              last.Album != snapshot.Album ||
                              last.Duration != snapshot.Duration ||
-                             last.CoverUrl != snapshot.CoverUrl;
+                             last.CoverUrl != snapshot.CoverUrl ||
+                             last.Player != snapshot.Player ||
+                             (_discordLyrics && last.Line != snapshot.Line);
         // Between two ticks (200 ms) the position barely moves; a big jump is a seek.
         var expected = last is null ? 0 : last.Position + (last.Playing ? 0.2 : 0);
         var seeked = last is not null && last.TrackKey == snapshot.TrackKey &&
@@ -167,6 +180,7 @@ public sealed class NowPlayingHub : IDisposable
             duration = snapshot.Duration,
             line = snapshot.Line,
             romanized = snapshot.Romanized,
+            translation = snapshot.Translation,
             next = snapshot.Next,
             hasLyrics = snapshot.HasLyrics,
             cover = snapshot.CoverVersion,
