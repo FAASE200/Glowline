@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using Glowline.Models;
+using Glowline.Services;
 
 namespace Glowline;
 
@@ -73,6 +74,7 @@ public sealed class WordHighlightLine
         if (line?.Words is { Count: > 0 })
         {
             _words = line.Words;
+            var gaps = WordSpacing.GapAfter(_words);
             for (var i = 0; i < _words.Count; i++)
             {
                 var word = _words[i];
@@ -105,7 +107,7 @@ public sealed class WordHighlightLine
                     _motions.Add(motion);
                 }
 
-                if (i < _words.Count - 1)
+                if (i < _words.Count - 1 && gaps[i])
                     _target.Inlines.Add(new Run(" "));
                 _brushes.Add(brush);
             }
@@ -120,7 +122,10 @@ public sealed class WordHighlightLine
         if (line is not null && line.Background.Length > 0)
             AppendBackground(line);
         if (line is not null)
+        {
             LyricRender.AppendRomanized(_target, line, BackgroundColor);
+            LyricRender.AppendTranslation(_target, line, BackgroundColor);
+        }
     }
 
     void AppendBackground(LrcLine line)

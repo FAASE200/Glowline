@@ -132,6 +132,7 @@ public partial class MainWindow : Window
         _animated = animated;
 
         InitializeComponent();
+        InitDesignDrop();
         ThemePaletteService.Changed += OnThemePaletteChanged;
         ApplyThemePalette(ThemePaletteService.Current);
         Closed += (_, __) => ThemePaletteService.Changed -= OnThemePaletteChanged;
@@ -453,7 +454,11 @@ public partial class MainWindow : Window
 
     public void OpenFullscreen(Window? source = null) => App.ShowPrimaryWindow();
 
-    void RefreshDesignerUi() => ActiveDesignText.Text = Loc.F("ActiveDesignFormat", App.Designs.Active.Name);
+    void RefreshDesignerUi()
+    {
+        ActiveDesignText.Text = Loc.F("ActiveDesignFormat", DesignDisplayName(App.Designs.Active.Name));
+        RefreshDesignLibrary();
+    }
 
     public void PersistActiveDesign()
     {
@@ -790,14 +795,8 @@ public partial class MainWindow : Window
 
     static string FriendlyPlayerName(string id)
     {
-        var lower = id.ToLowerInvariant();
-        if (lower.Contains("applemusic") || lower.Contains("apple")) return "Apple Music";
-        if (lower.Contains("spotify")) return "Spotify";
-        if (lower.Contains("msedge")) return "Microsoft Edge";
-        if (lower.Contains("chrome")) return "Google Chrome";
-        if (lower.Contains("firefox")) return "Firefox";
-        if (lower.Contains("wmplayer")) return "Windows Media Player";
-        return id;
+        var name = PlayerNames.Friendly(id);
+        return name.Length > 0 ? name : id;
     }
 
     void OnSnapshot(SessionSnapshot snap)
@@ -1244,6 +1243,7 @@ public partial class MainWindow : Window
         _settings.Settings.Language = option.Language;
         _settings.ScheduleSave();
         Loc.SetLanguage(option.Language);
+        _lyrics.RefreshTranslation();
     }
 
     void OnLanguageChanged(object? sender, EventArgs e)

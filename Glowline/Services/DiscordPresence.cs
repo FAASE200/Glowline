@@ -34,6 +34,9 @@ public sealed class DiscordPresence : IDisposable
     DateTime _nextConnectAttempt = DateTime.MinValue;
     int _sending;
 
+    /// <summary>Show the current lyric line instead of the artist (changes are rate-limited).</summary>
+    public bool ShowLyrics { get; set; }
+
     public bool IsConnected => _pipe?.IsConnected == true;
 
     public bool IsEnabled => _enabled;
@@ -93,11 +96,21 @@ public sealed class DiscordPresence : IDisposable
                 var now = DateTimeOffset.UtcNow;
                 var start = now - TimeSpan.FromSeconds(Math.Max(0, s.Position));
                 long? end = s.Duration is > 0 ? (start + TimeSpan.FromSeconds(s.Duration.Value)).ToUnixTimeMilliseconds() : null;
+                // "Apple Music · Glowline": the header of the card is always the
+                // Discord application's name, so the player goes in the line below.
+                var badge = s.Player.Length > 0 ? $"{s.Player} · Glowline" : "Glowline";
+                var artist = s.Artist.Length > 0 ? s.Artist : "Glowline";
+                // With lyrics on, the line goes where the artist was and the artist
+                // moves to the cover's hover text.
+                var line = ShowLyrics && s.HasLyrics ? s.Line.Trim() : "";
+                var hover = line.Length > 0
+                    ? (s.Album.Length > 0 ? $"{artist} — {s.Album}" : artist)
+                    : (s.Album.Length > 0 ? s.Album : s.Title);
                 activity = new
                 {
                     type = 2, // "Listening to"
                     details = Clip(s.Title),
-                    state = Clip(s.Artist.Length > 0 ? s.Artist : "Glowline"),
+                    state = Clip(line.Length > 0 ? line : artist),
                     timestamps = end is null
                         ? (object)new { start = start.ToUnixTimeMilliseconds() }
                         : new { start = start.ToUnixTimeMilliseconds(), end = end.Value },
@@ -107,11 +120,11 @@ public sealed class DiscordPresence : IDisposable
                         ? (object)new
                         {
                             large_image = s.CoverUrl,
-                            large_text = Clip(s.Album.Length > 0 ? s.Album : s.Title),
+                            large_text = Clip(hover),
                             small_image = "glowline",
-                            small_text = "Glowline",
+                            small_text = Clip(badge),
                         }
-                        : new { large_image = "glowline", large_text = Clip(s.Album.Length > 0 ? s.Album : "Glowline") },
+                        : new { large_image = "glowline", large_text = Clip(line.Length > 0 ? hover : s.Album.Length > 0 ? s.Album : badge) },
                 };
             }
 

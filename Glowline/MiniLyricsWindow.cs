@@ -230,7 +230,8 @@ public sealed class MiniLyricsWindow : Window
     static string Display(LrcLine line)
     {
         var text = line.Text.Length > 0 ? line.Text : line.Background;
-        return line.Romanized.Length > 0 ? text + "\n" + line.Romanized : text;
+        if (line.Romanized.Length > 0) text += "\n" + line.Romanized;
+        return line.Translation.Length > 0 ? text + "\n" + line.Translation : text;
     }
 
     void SetText(string current, string next)

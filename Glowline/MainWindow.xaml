@@ -971,6 +971,10 @@
                                       Margin="26,16,0,0" Checked="Romanization_Changed" Unchecked="Romanization_Changed"/>
                             <TextBlock Text="{loc:T RomanizationHint}" Foreground="{DynamicResource Faint}"
                                        FontSize="11" Margin="26,4,0,0" TextWrapping="Wrap"/>
+                            <CheckBox x:Name="TranslationCheck" Content="{loc:T TranslationToggle}"
+                                      Margin="26,16,0,0" Checked="Translation_Changed" Unchecked="Translation_Changed"/>
+                            <TextBlock Text="{loc:T TranslationHint}" Foreground="{DynamicResource Faint}"
+                                       FontSize="11" Margin="26,4,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
 
@@ -1132,7 +1136,26 @@
                                         Click="ImportDesign_Click"/>
                                 <Button Content="{loc:T ExportDesign}" Style="{StaticResource SmallButton}"
                                         Margin="6,0,0,0" Click="ExportDesign_Click"/>
+                                <Button Content="{loc:T DesignSaveToLibrary}" Style="{StaticResource SmallButton}"
+                                        Margin="6,0,0,0" Click="SaveDesignToLibrary_Click"/>
                             </StackPanel>
+                            <TextBlock Text="{loc:T DesignLibraryTitle}" Foreground="{DynamicResource Muted}"
+                                       FontSize="12" Margin="26,16,0,0"/>
+                            <Grid Margin="26,6,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="DesignLibraryCombo"/>
+                                <Button Grid.Column="1" Content="{loc:T DesignApply}" Style="{StaticResource SmallButton}"
+                                        Margin="6,0,0,0" Click="ApplyLibraryDesign_Click"/>
+                                <Button Grid.Column="2" Content="{loc:T DesignDelete}" Style="{StaticResource SmallButton}"
+                                        Margin="6,0,0,0" Click="DeleteLibraryDesign_Click"/>
+                            </Grid>
+                            <TextBlock x:Name="DesignLibraryEmpty" Text="{loc:T DesignLibraryEmpty}"
+                                       Foreground="{DynamicResource Faint}" FontSize="11" Margin="26,6,0,0"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
 
@@ -1236,6 +1259,24 @@
                             </Grid>
                             <TextBlock Text="{loc:T ShareHint}" Foreground="{DynamicResource Faint}"
                                        FontSize="11" Margin="26,4,0,0" TextWrapping="Wrap"/>
+                            <Grid Margin="26,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="230"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{loc:T ShareStyleLabel}" Foreground="{DynamicResource Muted}"
+                                           FontSize="12" VerticalAlignment="Center"/>
+                                <ComboBox x:Name="ShareStyleCombo" Grid.Column="1" SelectionChanged="ShareStyle_Changed"/>
+                            </Grid>
+                            <Grid Margin="26,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="230"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{loc:T ShareFormatLabel}" Foreground="{DynamicResource Muted}"
+                                           FontSize="12" VerticalAlignment="Center"/>
+                                <ComboBox x:Name="ShareFormatCombo" Grid.Column="1" SelectionChanged="ShareFormat_Changed"/>
+                            </Grid>
 
                             <CheckBox x:Name="ObsCheck" Content="{loc:T ObsOverlay}"
                                       Margin="26,18,0,0" Checked="Obs_Changed" Unchecked="Obs_Changed"/>
@@ -1255,6 +1296,8 @@
                             <TextBlock x:Name="DiscordHint" Text="{loc:T DiscordPresenceHint}"
                                        Foreground="{DynamicResource Faint}"
                                        FontSize="11" Margin="26,4,0,0" TextWrapping="Wrap"/>
+                            <CheckBox x:Name="DiscordLyricsCheck" Content="{loc:T DiscordLyricsToggle}"
+                                      Margin="26,12,0,0" Checked="DiscordLyrics_Changed" Unchecked="DiscordLyrics_Changed"/>
                         </StackPanel>
                     </Border>
 

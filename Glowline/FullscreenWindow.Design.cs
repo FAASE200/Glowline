@@ -319,6 +319,7 @@ public partial class FullscreenWindow
             Background = "",
             BackgroundWords = null,
             Romanized = line.Romanized,
+            Translation = line.Translation,
             SourceTime = line.SourceTime,
         };
     }

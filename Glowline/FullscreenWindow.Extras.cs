@@ -90,7 +90,10 @@ public partial class FullscreenWindow
             }
 
             var accent = _fusionBackground == Colors.White ? Color.FromRgb(0xFF, 0x3B, 0x30) : _fusionBackground;
-            var path = ShareCardService.CreateAndSave(line, track, art, accent);
+            var settings = App.Settings.Settings;
+            var style = (ShareCardService.CardStyle)Math.Clamp(settings.ShareStyle, 0, 2);
+            var format = (ShareCardService.CardFormat)Math.Clamp(settings.ShareFormat, 0, 2);
+            var path = ShareCardService.CreateAndSave(line, track, art, accent, style, format);
             App.MainWindowRef?.ShowNotice(Loc.F("ShareSavedFormat", path));
         }
         catch (Exception ex)

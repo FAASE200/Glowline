@@ -39,6 +39,7 @@ public static class LyricText
                 Words = mainWords,
                 BackgroundWords = backgroundWords,
                 Romanized = line.Romanized,
+                Translation = line.Translation,
                 SourceTime = line.SourceTime,
             });
         }

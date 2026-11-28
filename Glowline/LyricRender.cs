@@ -16,6 +16,22 @@ public static class LyricRender
             block.Inlines.Add(new Run(line.Text));
         AppendBackground(block, line, background);
         AppendRomanized(block, line, background);
+        AppendTranslation(block, line, background);
+    }
+
+    /// <summary>Appends the line's translation below it, in smaller text.</summary>
+    public static void AppendTranslation(TextBlock block, LrcLine line, Color color, double scale = 0.5)
+    {
+        if (line.Translation.Length == 0) return;
+        if (block.Inlines.Count > 0)
+            block.Inlines.Add(new LineBreak());
+
+        block.Inlines.Add(new Run(line.Translation)
+        {
+            FontSize = Math.Max(10, block.FontSize * scale),
+            FontWeight = FontWeights.Normal,
+            Foreground = new SolidColorBrush(color),
+        });
     }
 
     /// <summary>
