@@ -123,7 +123,7 @@ public partial class MainPage : ContentPage
 
     void RefreshText()
     {
-        VersionText.Text = $"v{AppInfo.Current.Version} · Android {AppInfo.Current.BuildString} · fSS";
+        VersionText.Text = $"v{Microsoft.Maui.ApplicationModel.AppInfo.Current.Version} · Android {Microsoft.Maui.ApplicationModel.AppInfo.Current.BuildString} · fSS";
         SettingsButton.Text = "⚙";
         FullscreenButton.Text = MobileLoc.T("Android.Fullscreen");
         PermissionsTitle.Text = MobileLoc.T("Android.PermissionsTitle");
@@ -217,7 +217,7 @@ public partial class MainPage : ContentPage
     void RefreshUpdateUi()
     {
         var updates = AndroidUpdateService.Instance;
-        UpdateVersionText.Text = MobileLoc.F("CurrentVersionFormat", AppInfo.Current.Version);
+        UpdateVersionText.Text = MobileLoc.F("CurrentVersionFormat", Microsoft.Maui.ApplicationModel.AppInfo.Current.Version);
         UpdateStatusText.Text = updates.Message;
         UpdateProgress.IsVisible = updates.IsDownloading;
         UpdateProgress.Progress = updates.Progress;
